@@ -2,7 +2,7 @@ import os
 import json
 import torch.utils.data as data
 
-class SingeJsonDataset(data.Dataset):
+class SingleJsonDataset(data.Dataset):
     def __init__(self, json_file, root_dir, transform = None):
         datafile = open(json_file, 'r')
         self.dataset = json.load(datafile)
@@ -19,6 +19,7 @@ filelist = ['data_fake.json']
 for j in filelist:
     if not j.endswith('.json'):
         continue  # skip non-json files
-    list_of_datasets.append(SingeJsonDataset(json_file=j, root_dir='./', transform=None))
+    list_of_datasets.append(SingleJsonDataset(json_file=j, root_dir='./', transform=None))
 # once all single json datasets are created you can concat them into a single one:
 multiple_json_dataset = data.ConcatDataset(list_of_datasets)
+print(multiple_json_dataset[0])

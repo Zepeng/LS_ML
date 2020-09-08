@@ -1,8 +1,6 @@
 import numpy
 import torch
 
-X = numpy.random.uniform(-10, 10, 201).reshape(1, 1, -1)
-
 class Simple1DCNN(torch.nn.Module):
     def __init__(self):
         super(Simple1DCNN, self).__init__()
@@ -17,7 +15,8 @@ class Simple1DCNN(torch.nn.Module):
         x = self.fc(x)
 
         return x
-
-print(X.shape)
-model = Simple1DCNN().double()
-print(model(torch.tensor(X)).shape)
+def test():
+    X = numpy.random.uniform(-10, 10, 402).reshape(2, 1, -1)
+    print(X, X.shape, type(X))
+    model = Simple1DCNN().double()
+    print(model(torch.tensor(X)).shape)
