@@ -51,9 +51,9 @@ class PMTIDMap():
         xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)
         return(xbin, ybin)
 
-def roottojson(rootfile):
+def roottojson(mapfile, rootfile):
     # The csv file of PMT map must have the same tag as the MC production.
-    pmtmap = PMTIDMap('/cvmfs/juno.ihep.ac.cn/sl6_amd64_gcc830/Pre-Release/J19v1r1-Pre4/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv')
+    pmtmap = PMTIDMap(mapfile)
     pmtmap.CalcDict()
 
     uptree = up.open(rootfile)['data']
@@ -65,15 +65,21 @@ def roottojson(rootfile):
     hittime= uptree.array('hittime')
     dataset = []
     for i in range(len(pmtids)):
-        #save charge and hittime to 2D array
+        #use a dictionary to save the array and vertex information
+        eventdict = {}
+        #save charge and hittime to 3D array
         event2dimg = np.zeros((225, 124, 2))
         for j in range(len(pmtids[i])):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
             event2dimg[xbin, ybin, 0] += npes[i][j]
             event2dimg[xbin, ybin, 1] += hittime[i][j]
-        np.save('event2dimg_%d.npy' % i, event2dimg)
+        eventdict['pmtinfo'] = event2dimg.tolist()
+        eventdict['vertex'] = np.array([initxs[i], initys[i], initzs[i]]).tolist()
+        dataset.append(eventdict)
+
+    with open('data_fake.json', 'w') as data_file:
+        json.dump(dataset, data_file)
 
 
 if __name__ == '__main__':
-    roottojson('/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
-    pmtmap.CalcDict()
+    roottojson('/cvmfs/juno.ihep.ac.cn/sl6_amd64_gcc830/Pre-Release/J19v1r1-Pre4/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
