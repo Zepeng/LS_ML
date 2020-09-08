@@ -20,6 +20,7 @@ from torch.optim import lr_scheduler
 
 import argparse
 import conv1d
+import test
 
 class SingleJsonDataset(Dataset):
     def __init__(self, json_file, root_dir, transform = None):
@@ -147,7 +148,7 @@ if __name__ == "__main__":
     start_epoch = 0
 
     print('==> Building model..')
-    net = conv1d.Simple1DCNN().double()
+    net = test.CNN1D().double()
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
     # We use SGD
