@@ -1,28 +1,37 @@
 import warnings
 
 import matplotlib.pyplot as plt
-from sklearn.datasets import fetch_openml
 from sklearn.exceptions import ConvergenceWarning
 import numpy as np
 
 import pickle
+import uproot as up
+from scipy.special import softmax
 
-dataset = np.load('fake_data.npy')
-X_train = []
-X_test = []
-y_train = []
-y_test = []
-#a debug print to screen to check the data loading is correct
-if False:
-    print(dataset[0][0], dataset[0][1])
+#load the data from root file.
+def loadroot(rootfile):
+    tfile = uproot.open(rootfile)
+
+def loadfakedata(datafile):
+    dataset = np.load(datafile, allow_pickle=True)
+    #a debug print to screen to check the data loading is correct
+    if False:
+        print(dataset[0][0], dataset[0][1])
+    return dataset
+
+dataset = loadfakedata('fake_data.npy')
+input_train = []
+target_train = []
+input_test = []
+target_test = []
 #split the dataset into train and test set.
 for i in range(len(dataset)):
     if i < 0.8*len(dataset):
-        X_train.append(dataset[i][0])
-        y_train.append(dataset[i][1])
+        input_train.append(dataset[i][0])
+        target_train.append(dataset[i][1])
     else:
-        X_test.append(dataset[i][0])
-        y_test.append(dataset[i][1])
+        input_test.append(dataset[i][0])
+        target_test.append(dataset[i][1])
 
 #use a ML model from scikit
 from sklearn import naive_bayes
@@ -32,11 +41,16 @@ classifier = naive_bayes.GaussianNB()
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=ConvergenceWarning,
                             module="sklearn")
-    classifier.fit(X_train, y_train)
+    classifier.fit(input_train, target_train)
     pkl_filename = 'pickle_model.pkl'
     with open(pkl_filename, 'wb') as pfile:
         pickle.dump(classifier, pfile)
 
-print(classifier.predict_proba(X_test[:10]), y_test[:10])
-print("Training set score: %f" % classifier.score(X_train, y_train))
-print("Test set score: %f" % classifier.score(X_test, y_test))
+if True:
+    predict_proba = classifier.predict_proba(input_test[:10])
+    targets = target_test[:10]
+    print(classifier.predict(input_test[:10]), targets)
+    for item, target in zip(predict_proba, targets):
+        print(item, softmax(item), target)
+print("Training set score: %f" % classifier.score(input_train, target_train))
+print("Test set score: %f" % classifier.score(input_test, target_test))
