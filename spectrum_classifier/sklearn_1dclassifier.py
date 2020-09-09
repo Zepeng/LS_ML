@@ -7,6 +7,7 @@ import numpy as np
 import pickle
 import uproot as up
 from scipy.special import softmax
+import random
 
 #load the data from root file.
 def loadroot(rootfile):
@@ -20,6 +21,7 @@ def loadfakedata(datafile):
     return dataset
 
 dataset = loadfakedata('fake_data.npy')
+random.shuffle(dataset)
 input_train = []
 target_train = []
 input_test = []
