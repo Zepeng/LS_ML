@@ -2,7 +2,7 @@ import uproot as up
 import numpy as np
 import matplotlib.pyplot as plt
 
-def LoadCalib(rootfile, eventtype):
+def LoadCalib(rootfile, eventtype, evtmax):
     if eventtype not in ['FastNeutron', 'CoTree']:
         print('Wrong Event Type')
         return 0
@@ -12,7 +12,7 @@ def LoadCalib(rootfile, eventtype):
         prompttime = tree.array('pmtPromptTime')
         print(np.max(prompttime), np.min(prompttime))
         events = []
-        for evtid in range(len(prompttime)):
+        for evtid in range(min(evtmax, len(prompttime))):
             eventcharge = promptcharge[evtid]
             eventtime = prompttime[evtid]
             qevt = []
@@ -33,7 +33,7 @@ def LoadCalib(rootfile, eventtype):
         prompttime = tree.array('pmtTime')
         print(np.max(prompttime), np.min(prompttime))
         events = []
-        for evtid in range(len(prompttime)):
+        for evtid in range(min(evtmax, len(prompttime))):
             eventcharge = promptcharge[evtid]
             eventtime = prompttime[evtid]
             qevt = []
@@ -49,8 +49,9 @@ def LoadCalib(rootfile, eventtype):
         np.save('%s.npy' % eventtype, np.array(events))
         return np.array(events)
 
-events = LoadCalib('/junofs/users/lirh/DYB/run67527.root', 'FastNeutron')
-print(events.shape)
-events = LoadCalib('/junofs/users/lirh/DYB/run67522.root', 'CoTree')
-print(events.shape)
+def test():
+    events = LoadCalib('/junofs/users/lirh/DYB/run67527.root', 'FastNeutron', 100)
+    print(events.shape)
+    events = LoadCalib('/junofs/users/lirh/DYB/run67522.root', 'CoTree', 100)
+    print(events.shape)
 
