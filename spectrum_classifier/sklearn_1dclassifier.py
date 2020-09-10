@@ -13,10 +13,10 @@ import load_calib
 #Choose the training type
 ## FakeTest classify two type of fake data sin(x) and 2*x/pi
 ## CalibTrain train with calibration neutron and gamma
-
 FakeTest = False
 CalibTrain = True
 
+#load the fake data for test
 def loadfakedata(datafile):
     dataset = np.load(datafile, allow_pickle=True)
     #a debug print to screen to check the data loading is correct
@@ -24,12 +24,13 @@ def loadfakedata(datafile):
         print(dataset[0][0], dataset[0][1])
     return dataset
 
-
+#build the dataset for train/test
 input_train = []
 target_train = []
 input_test = []
 target_test = []
 
+#load fake data for test.
 if FakeTest == True:
     dataset = loadfakedata('fake_data.npy')
     random.shuffle(dataset)
@@ -42,6 +43,7 @@ if FakeTest == True:
             input_test.append(dataset[i][0])
             target_test.append(dataset[i][1])
 
+#load calibration data
 if CalibTrain ==True:
     #load the data from root file.
     neutron_events = load_calib.LoadCalib('/junofs/users/lirh/DYB/run67527.root', 'FastNeutron', 18937)
@@ -53,6 +55,7 @@ if CalibTrain ==True:
     #shuffle the signal and background events by indices
     indices = np.arange(len(events))
     random.shuffle(indices)
+    #split the dataset into two parts for training and testing respectively.
     for index in indices:
         if len(input_train) < 0.8*len(events):
             input_train.append(events[index])
