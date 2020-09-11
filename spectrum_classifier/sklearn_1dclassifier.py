@@ -68,16 +68,17 @@ if CalibTrain ==True:
 
 if EGammaTrain == True:
     events = load_egamma.LoadEGamma('/hpcfs/juno/junogpu/luoxj/Data_PSD/elecsim_SumAllPmtWaves.root')
-    print(events.shape)
-    random.shuffle(events)
-    for i in range(len(events)):
-        if i < 0.8*len(events):
-            input_train.append(events[i][0])
-            target_train.append(events[i][1])
+    print(events[0])
+    indices = np.arange(len(events))
+    random.shuffle(indices)
+    #split the dataset into two parts for training and testing respectively.
+    for index in indices:
+        if len(input_train) < 0.8*len(events):
+            input_train.append(events[index][0])
+            target_train.append(events[index][1])
         else:
-            input_test.append(events[i][0])
-            target_test.append(events[i][1])
-
+            input_test.append(events[index][0])
+            target_test.append(events[index][1])
 
 #use a ML model from scikit
 from sklearn import naive_bayes

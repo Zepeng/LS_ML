@@ -6,10 +6,10 @@ def LoadEGamma(rootfile, isTest=False):
     tree = up.open(rootfile)['waves']
     wave_sum = tree.array('waves_Sum')
     gamma_tag = tree.array('isGamma')
-    time_sequence = np.arange(len(wave_sum[0]))
+    time_sequence = np.arange(500)
     events = []
     for evtid in range( len(wave_sum) ):
-        wave_instance = wave_sum[evtid]
+        wave_instance = wave_sum[evtid][150:650]
         bins, edges = np.histogram(time_sequence, bins = 10,  weights = wave_instance)
         events.append([bins, gamma_tag[evtid]])
     return np.array(events)
