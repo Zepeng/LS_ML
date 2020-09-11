@@ -9,12 +9,14 @@ import uproot as up
 from scipy.special import softmax
 import random
 import load_calib
+import load_egamma
 
 #Choose the training type
 ## FakeTest classify two type of fake data sin(x) and 2*x/pi
 ## CalibTrain train with calibration neutron and gamma
 FakeTest = False
-CalibTrain = True
+CalibTrain = False
+EGammaTrain = True
 
 #load the fake data for test
 def loadfakedata(datafile):
@@ -46,9 +48,9 @@ if FakeTest == True:
 #load calibration data
 if CalibTrain ==True:
     #load the data from root file.
-    neutron_events = load_calib.LoadCalib('/junofs/users/lirh/DYB/run67527.root', 'FastNeutron', 18937)
+    neutron_events = load_calib.LoadCalib('/junofs/users/lirh/DYB/run67527.root', 'FastNeutron')
     neutron_tags = np.zeros(len(neutron_events))
-    gamma_events = load_calib.LoadCalib('/junofs/users/lirh/DYB/run67522.root', 'CoTree', 18937)
+    gamma_events = load_calib.LoadCalib('/junofs/users/lirh/DYB/run67522.root', 'CoTree')
     gamma_tags = np.ones(len(gamma_events))
     events = np.concatenate((neutron_events, gamma_events) , axis=0)
     tags = np.concatenate((neutron_tags, gamma_tags))
@@ -63,6 +65,19 @@ if CalibTrain ==True:
         else:
             input_test.append(events[index])
             target_test.append(tags[index])
+
+if EGammaTrain == True:
+    events = load_egamma.LoadEGamma('/hpcfs/juno/junogpu/luoxj/Data_PSD/elecsim_SumAllPmtWaves.root')
+    print(events.shape)
+    random.shuffle(events)
+    for i in range(len(events)):
+        if i < 0.8*len(events):
+            input_train.append(events[i][0])
+            target_train.append(events[i][1])
+        else:
+            input_test.append(events[i][0])
+            target_test.append(events[i][1])
+
 
 #use a ML model from scikit
 from sklearn import naive_bayes
