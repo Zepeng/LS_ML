@@ -3,7 +3,6 @@ import json
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-dataset = []
 
 class PMTIDMap():
     #The position of each pmt is stored in a root file different from the data file.
@@ -51,7 +50,7 @@ class PMTIDMap():
         xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)
         return(xbin, ybin)
 
-def roottojson(mapfile, rootfile):
+def roottojson(mapfile, rootfile, outfile=''):
     # The csv file of PMT map must have the same tag as the MC production.
     pmtmap = PMTIDMap(mapfile)
     pmtmap.CalcDict()
@@ -68,18 +67,21 @@ def roottojson(mapfile, rootfile):
         #use a dictionary to save the array and vertex information
         eventdict = {}
         #save charge and hittime to 3D array
-        event2dimg = np.zeros((225, 124, 2))
+        event2dimg = np.zeros((2, 225, 124))
         for j in range(len(pmtids[i])):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
-            event2dimg[xbin, ybin, 0] += npes[i][j]
-            event2dimg[xbin, ybin, 1] += hittime[i][j]
+            event2dimg[0, xbin, ybin] += npes[i][j]
+            event2dimg[1, xbin, ybin] += hittime[i][j]
         eventdict['pmtinfo'] = event2dimg.tolist()
         eventdict['vertex'] = np.array([initxs[i], initys[i], initzs[i]]).tolist()
         dataset.append(eventdict)
 
-    with open('data_fake.json', 'w') as data_file:
-        json.dump(dataset, data_file)
-
+    if outfile == '':
+        with open('data_fake.json', 'w') as data_file:
+            json.dump(dataset, data_file)
+    else:
+        with open(outfile, 'w') as data_file:
+            json.dump(dataset, data_file)
 
 if __name__ == '__main__':
     roottojson('/cvmfs/juno.ihep.ac.cn/sl6_amd64_gcc830/Pre-Release/J19v1r1-Pre4/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
