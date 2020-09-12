@@ -15,8 +15,8 @@ import load_egamma
 ## FakeTest classify two type of fake data sin(x) and 2*x/pi
 ## CalibTrain train with calibration neutron and gamma
 FakeTest = False
-CalibTrain = False
-EGammaTrain = True
+CalibTrain = True
+EGammaTrain = False
 
 #load the fake data for test
 def loadfakedata(datafile):
@@ -49,9 +49,15 @@ if FakeTest == True:
 if CalibTrain ==True:
     #load the data from root file.
     neutron_events = load_calib.LoadCalib('/junofs/users/lirh/DYB/run67527.root', 'FastNeutron')
-    neutron_tags = np.zeros(len(neutron_events))
     gamma_events = load_calib.LoadCalib('/junofs/users/lirh/DYB/run67522.root', 'CoTree')
+    #use same statistics from neutron and gamma sample
+    #equal_evt = min(len(neutron_events), len(gamma_events))
+    #neutron_events = neutron_events[:equal_evt]
+    #gamma_events = gamma_events[:equal_evt]
+    #Tag the events with 0 for neutron and 1 for gamma
+    neutron_tags = np.zeros(len(neutron_events))
     gamma_tags = np.ones(len(gamma_events))
+    #merge neutron and gamma datasets to make one single dataset.
     events = np.concatenate((neutron_events, gamma_events) , axis=0)
     tags = np.concatenate((neutron_tags, gamma_tags))
     #shuffle the signal and background events by indices

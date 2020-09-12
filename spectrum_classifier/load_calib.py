@@ -24,7 +24,7 @@ def LoadCalib(rootfile, eventtype):
                             qevt.append(eventcharge[i][j][k])
                             tevt.append(eventtime[i][j][k])
             bins, edges = np.histogram(tevt, bins = 10, range=(-1650, -850), weights = qevt)
-            events.append(bins)
+            events.append(bins/np.sum(bins))
         np.save('%s.npy' % eventtype, np.array(events))
         return np.array(events)
     else:
@@ -45,7 +45,7 @@ def LoadCalib(rootfile, eventtype):
                             qevt.append(eventcharge[i][j][k])
                             tevt.append(eventtime[i][j][k])
             bins, edges = np.histogram(tevt, bins = 10, range=(-1650, -850), weights = qevt)
-            events.append(bins)
+            events.append(bins/np.sum(bins))
         np.save('%s.npy' % eventtype, np.array(events))
         return np.array(events)
 
