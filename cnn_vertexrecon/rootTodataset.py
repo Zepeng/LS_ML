@@ -19,6 +19,7 @@ class PMTIDMap():
         for line in pmtcsv:
             pmt_instance = (line.split())
             self.pmtmap[str(pmt_instance[0])] = ( int(pmt_instance[0]), float(pmt_instance[1]), float(pmt_instance[2]), float(pmt_instance[3]), float(pmt_instance[4]), float(pmt_instance[5]))
+        self.maxpmtid = len(self.pmtmap)
 
     def IdToPos(self, pmtid):
         return self.pmtmap[str(pmtid)]
