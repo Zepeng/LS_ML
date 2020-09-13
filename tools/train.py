@@ -20,7 +20,6 @@ from torch.optim import lr_scheduler
 
 import argparse
 import conv1d
-import test
 
 class SingleJsonDataset(Dataset):
     def __init__(self, json_file, root_dir, transform = None):
@@ -58,10 +57,10 @@ def train(trainloader, epoch):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
-        optimizer.step()
         _, predicted = outputs.max(1)
         loss = criterion(outputs.view(len(outputs), -1), targets)
         loss.backward()
+        optimizer.step()
         train_loss += loss.item()
         total += targets.size(0)
         #correct += predicted.eq(targets).sum().item()
@@ -80,14 +79,10 @@ def test(testloader, epoch):
         for batch_idx, (inputs, targets) in enumerate(testloader):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
-            _, predicted = outputs.max(1)
-            loss = criterion(predicted, targets)
+            loss = criterion(outputs.view(len(outputs), -1), targets)
             test_loss += loss.item()
             total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-            softmax = nn.Softmax()
             for m in range(outputs.size(0)):
-                score.append([softmax(outputs[m])[1].item(), targets[m].item()])
                 print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                         % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
 
@@ -148,7 +143,7 @@ if __name__ == "__main__":
     start_epoch = 0
 
     print('==> Building model..')
-    net = test.CNN1D().double()
+    net = conv1d.Simple1DCNN().double()
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
     # We use SGD
@@ -166,6 +161,11 @@ if __name__ == "__main__":
         net.load_state_dict(checkpoint['net'])
         best_acc = checkpoint['acc']
         start_epoch = checkpoint['epoch'] + 1
+
+    y_train_loss = np.zeros(100)
+    y_train_acc = np.zeros(100)
+    y_valid_loss = np.zeros(100)
+    y_valid_acc = np.zeros(100)
     for epoch in range(start_epoch, start_epoch + 10):
         # set the learning rate
         adjust_learning_rate(optimizer, epoch, lr)
@@ -174,7 +174,7 @@ if __name__ == "__main__":
             iterout += "lr=%.3e"%(param_group['lr'])
             print(iterout)
             try:
-                rain_ave_loss, train_ave_acc = train(train_loader, epoch)
+                train_ave_loss, train_ave_acc = train(train_loader, epoch)
             except Exception as e:
                 print("Error in training routine!")
                 print(e.message)
@@ -195,8 +195,9 @@ if __name__ == "__main__":
                 traceback.print_exc(e)
                 break
             print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,prec1,valid_loss))
-            test_score.append(score)
+            print(score)
+            #test_score.append(score)
             y_valid_loss[epoch] = valid_loss
             y_valid_acc[epoch]  = prec1
-        print(y_train_loss, y_train_acc, y_valid_loss, y_valid_acc)
-        np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
+        print(y_train_loss, y_train_acc)
+        #np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
