@@ -15,8 +15,8 @@ import load_egamma
 ## FakeTest classify two type of fake data sin(x) and 2*x/pi
 ## CalibTrain train with calibration neutron and gamma
 FakeTest = False
-CalibTrain = True
-EGammaTrain = False
+CalibTrain = False
+EGammaTrain = True
 
 #load the fake data for test
 def loadfakedata(datafile):
@@ -50,10 +50,7 @@ if CalibTrain ==True:
     #load the data from root file.
     neutron_events = load_calib.LoadCalib('/junofs/users/lirh/DYB/run67527.root', 'FastNeutron')
     gamma_events = load_calib.LoadCalib('/junofs/users/lirh/DYB/run67522.root', 'CoTree')
-    #use same statistics from neutron and gamma sample
-    #equal_evt = min(len(neutron_events), len(gamma_events))
-    #neutron_events = neutron_events[:equal_evt]
-    #gamma_events = gamma_events[:equal_evt]
+    gamma_events = gamma_events[:2*len(neutron_events)]
     #Tag the events with 0 for neutron and 1 for gamma
     neutron_tags = np.zeros(len(neutron_events))
     gamma_tags = np.ones(len(gamma_events))
@@ -100,10 +97,36 @@ with warnings.catch_warnings():
         pickle.dump(classifier, pfile)
 
 if True:
-    predict_proba = classifier.predict_proba(input_test[:10])
-    targets = target_test[:10]
-    print(classifier.predict(input_test[:10]), targets)
-    for item, target in zip(predict_proba, targets):
-        print(item, softmax(item), target)
+    predict_proba = classifier.predict_proba(input_test)
+    print(predict_proba.shape)
+    print(classifier.predict(input_test[:10]), target_test[:10])
+    tag_0 = []
+    tag_1 = []
+    for i in range(len(predict_proba)):
+        if target_test[i] == 0:
+            tag_0.append(predict_proba[i][1])
+        else:
+            tag_1.append(predict_proba[i][1])
+    fig1, ax1 = plt.subplots()
+    n0, bins0, patches0 = ax1.hist(tag_0, bins=np.linspace(0, 1, 21), color='red', histtype='step',label='Neutron')
+    n1, bins1, patches1 = ax1.hist(tag_1, bins=np.linspace(0, 1, 21), color='blue', histtype='step', label='Co')
+    ax1.set_xlim(0,1)
+    ax1.legend()
+    ax1.set_xlabel('Prediction output')
+    fig1.savefig('predicts.png')
+
+    eff_neutron = []
+    eff_gamma = []
+    for i in range(len(n0)):
+        eff_neutron.append(np.sum(n0[i:])*1.0/np.sum(n0))
+        eff_gamma.append(np.sum(n1[i:])*1.0/np.sum(n1))
+    fig2, ax2 = plt.subplots()
+    ax2.plot(eff_neutron, eff_gamma)
+    ax2.set_xlabel('Neutron efficiency')
+    ax2.set_ylabel('Gamma efficiency')
+    ax2.set_xlim(0, 0.3)
+    ax2.set_ylim(0, 1)
+    fig2.savefig('roc.png')
+
 print("Training set score: %f" % classifier.score(input_train, target_train))
 print("Test set score: %f" % classifier.score(input_test, target_test))
