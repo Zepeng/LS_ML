@@ -3,6 +3,7 @@ import json
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
+import argparse
 
 class PMTIDMap():
     #The position of each pmt is stored in a root file different from the data file.
@@ -84,4 +85,10 @@ def roottojson(mapfile, rootfile, outfile=''):
             json.dump(dataset, data_file)
 
 if __name__ == '__main__':
-    roottojson('/cvmfs/juno.ihep.ac.cn/sl6_amd64_gcc830/Pre-Release/J19v1r1-Pre4/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
+    parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
+    parser.add_argument('--pmtmap', type=str, help='csc file of PMT map in JUNO.')
+    parser.add_argument('--infile', '-i', type=str, help='Input root file.')
+    parser.add_argument('--outfile', '-o', type=str, help='Output root file.')
+    args = parser.parse_args()
+    roottojson(args.pmtmap, args.infile, args.outfile)
+    #'/cvmfs/juno.ihep.ac.cn/sl6_amd64_gcc830/Pre-Release/J19v1r1-Pre4/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
