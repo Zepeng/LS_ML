@@ -358,4 +358,4 @@ def test():
     x = torch.rand(1, 2, 225, 125)
     print(x.dtype)
     print(net(x))
-test()
+#test()

@@ -18,7 +18,7 @@ import torch.backends.cudnn as cudnn
 from torch.optim import lr_scheduler
 
 import argparse
-import junodata, vgg
+import junodata, vgg, resnet
 
 device = 'cuda'
 if torch.cuda.is_available():
@@ -45,7 +45,7 @@ def mean_square_loss(y_true, y_pred):
     #cross_entropy = tf.pow(cross_entropy, 0.5)
     cross_entropy = torch.mean(cross_entropy)
 
-    return cross_entropy
+    return cross_entropy/len(y_tr)
 
 def train(trainloader, epoch):
     print('\nEpoch: %d' % epoch)
@@ -80,9 +80,8 @@ def test(testloader, epoch):
             loss = mean_square_loss(outputs, targets)
             test_loss += loss.item()
             total += targets.size(0)
-            softmax = nn.Softmax()
             for m in range(outputs.size(0)):
-                score.append([softmax(outputs[m])[1].item(), targets[m].item()])
+                score.append([outputs[m], targets[m]])
                 print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                         % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
 
@@ -143,7 +142,7 @@ if __name__ == "__main__":
     start_epoch = 0
 
     print('==> Building model..')
-    net = vgg.vgg16()
+    net = resnet.resnet18()
     # We use SGD
     optimizer = torch.optim.SGD(net.parameters(), lr, momentum=momentum, weight_decay=weight_decay)
 
@@ -159,6 +158,9 @@ if __name__ == "__main__":
         net.load_state_dict(checkpoint['net'])
         best_acc = checkpoint['acc']
         start_epoch = checkpoint['epoch'] + 1
+    y_train_loss = np.zeros(100)
+    y_train_acc = np.zeros(100)
+    test_score = []
     for epoch in range(start_epoch, start_epoch + 10):
         # set the learning rate
         adjust_learning_rate(optimizer, epoch, lr)
@@ -189,7 +191,5 @@ if __name__ == "__main__":
                 break
             print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,prec1,valid_loss))
             test_score.append(score)
-            y_valid_loss[epoch] = valid_loss
-            y_valid_acc[epoch]  = prec1
-        print(y_train_loss, y_train_acc, y_valid_loss, y_valid_acc)
-        np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
+        print(y_train_loss, y_train_acc)
+        #np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
