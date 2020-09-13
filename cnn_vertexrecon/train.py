@@ -28,11 +28,24 @@ else:
 best_acc = 0 # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 NUM_EPOCHS = 5
+
 def adjust_learning_rate(optimizer, epoch, lr):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     lr = lr
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
+
+def mean_square_loss(y_true, y_pred):
+    '''
+    loss function
+    '''
+    y_tr = y_true[:, 0:3]
+
+    cross_entropy = torch.mean(torch.pow((y_tr - y_pred), 2), 1)
+    #cross_entropy = tf.pow(cross_entropy, 0.5)
+    cross_entropy = torch.mean(cross_entropy)
+
+    return cross_entropy
 
 def train(trainloader, epoch):
     print('\nEpoch: %d' % epoch)
@@ -44,9 +57,9 @@ def train(trainloader, epoch):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
-        optimizer.step()
-        loss = criterion(outputs, targets)
+        loss = mean_square_loss(outputs, targets)
         loss.backward()
+        optimizer.step()
         train_loss += loss.item()
         total += targets.size(0)
         print(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
@@ -64,11 +77,9 @@ def test(testloader, epoch):
         for batch_idx, (inputs, targets) in enumerate(testloader):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
-            _, predicted = outputs.max(1)
-            loss = criterion(predicted, targets)
+            loss = mean_square_loss(outputs, targets)
             test_loss += loss.item()
             total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
             softmax = nn.Softmax()
             for m in range(outputs.size(0)):
                 score.append([softmax(outputs[m])[1].item(), targets[m].item()])
@@ -133,8 +144,6 @@ if __name__ == "__main__":
 
     print('==> Building model..')
     net = vgg.vgg16()
-    # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda()
     # We use SGD
     optimizer = torch.optim.SGD(net.parameters(), lr, momentum=momentum, weight_decay=weight_decay)
 
@@ -158,7 +167,7 @@ if __name__ == "__main__":
             iterout += "lr=%.3e"%(param_group['lr'])
             print(iterout)
             try:
-                rain_ave_loss, train_ave_acc = train(train_loader, epoch)
+                train_ave_loss, train_ave_acc = train(train_loader, epoch)
             except Exception as e:
                 print("Error in training routine!")
                 print(e.message)
