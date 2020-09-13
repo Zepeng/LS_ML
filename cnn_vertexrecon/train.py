@@ -47,30 +47,45 @@ def mean_square_loss(y_true, y_pred):
 
     return cross_entropy/len(y_tr)
 
+def dist_acc(y_true, y_pred):
+    '''
+    accuracy defined as ratio of events with dist to real vertex
+    less than 20 cm
+    '''
+    y_tr = y_true[:, 0:3]
+    dists = torch.sum(torch.pow((y_tr - y_pred), 2), 1)
+    acc = 0
+    for dist in dists:
+        if dist < 40000:
+            acc += 1
+    return acc*1.0/len(y_true)
+
 def train(trainloader, epoch):
     print('\nEpoch: %d' % epoch)
     net.train()
     train_loss = 0
-    correct = 0
+    train_acc =0
     total = 0
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
         loss = mean_square_loss(outputs, targets)
+        acc = dist_acc(outputs, targets)
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
+        train_acc += acc
         total += targets.size(0)
         print(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
-    return train_loss/len(trainloader), 100.*correct/total
+                % (train_loss/(batch_idx+1), 100.*train_acc/total, train_acc, total))
+    return train_loss/len(trainloader), 100.*train_acc/total
 
 def test(testloader, epoch):
     global best_acc
     net.eval()
     test_loss = 0
-    correct = 0
+    test_acc = 0
     total = 0
     score = []
     with torch.no_grad():
@@ -78,15 +93,17 @@ def test(testloader, epoch):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
             loss = mean_square_loss(outputs, targets)
+            acc = dist_acc(outputs, targets)
+            test_acc += acc
             test_loss += loss.item()
             total += targets.size(0)
             for m in range(outputs.size(0)):
                 score.append([outputs[m], targets[m]])
                 print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                        % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+                        % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total))
 
                 # Save checkpoint.
-            acc = 100.*correct/total
+            acc = 100.*test_acc/total
             if acc > best_acc:
                 print('Saving..')
                 state = {'net': net.state_dict(),
@@ -98,7 +115,7 @@ def test(testloader, epoch):
                 torch.save(state, './checkpoint_sens/ckpt_%d.t7' % epoch)
                 torch.save(state, './checkpoint_sens/ckpt.t7' )
                 best_acc = acc
-            return test_loss/len(testloader), 100.*correct/total, score
+            return test_loss/len(testloader), 100.*test_acc/total, score
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch 1d conv net classifier')
@@ -109,7 +126,8 @@ if __name__ == "__main__":
     # Data
     print('==> Preparing data..')
     list_of_datasets = []
-    filelist = ['data_fake.json']
+    import glob
+    filelist = glob.glob('./*.json')
     for j in filelist:
         if not j.endswith('.json'):
             continue  # skip non-json files
