@@ -185,5 +185,6 @@ def vgg19_bn(pretrained=False, progress=True, **kwargs):
 def test():
     net = vgg16()
     x = torch.rand(1, 2, 225, 125)
+    print(x.dtype)
     print(net(x))
-test()
+#test()

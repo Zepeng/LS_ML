@@ -1,5 +1,5 @@
 import os
-import json
+import json, torch
 import numpy as np
 import torch.utils.data as data
 
@@ -13,7 +13,8 @@ class SingleJsonDataset(data.Dataset):
 
     def __getitem__(self, idx):
         sample = self.dataset[idx]
-        return np.asarray(sample['pmtinfo']), np.asarray(sample['vertex'])
+        return torch.from_numpy(np.asarray(sample['pmtinfo'])).to(torch.float32),\
+                torch.from_numpy(np.asarray(sample['vertex'])).to(torch.float32)
 
 def test():
     list_of_datasets = []
@@ -26,4 +27,4 @@ def test():
     multiple_json_dataset = data.ConcatDataset(list_of_datasets)
     print(multiple_json_dataset[0][0].shape)
 
-test()
+#test()

@@ -67,7 +67,7 @@ def roottojson(mapfile, rootfile, outfile=''):
         #use a dictionary to save the array and vertex information
         eventdict = {}
         #save charge and hittime to 3D array
-        event2dimg = np.zeros((2, 225, 124))
+        event2dimg = np.zeros((2, 225, 124), dtype=np.float)
         for j in range(len(pmtids[i])):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
             event2dimg[0, xbin, ybin] += npes[i][j]
