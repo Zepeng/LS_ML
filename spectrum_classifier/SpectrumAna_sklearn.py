@@ -22,6 +22,7 @@ class SpectrumAna():
     target_test = []
     models = []
     def __init__(self, task):
+        #This module is designed to do only three types to task.
         if task not in ['FakeTest', 'CalibTrain', 'EGammaTrain']:
             print('The task is not supported by this module!')
             sys.exit()
@@ -43,7 +44,6 @@ class SpectrumAna():
             else:
                 self.input_test.append(dataset[i][0])
                 self.target_test.append(dataset[i][1])
-
 
     #load the dataset for gamma/neutron separation from calibration
     def loadcalib(self, neutronfile, gammafile):
@@ -70,6 +70,7 @@ class SpectrumAna():
                 self.target_test.append(tags[index])
 
     def loadegamma(self, rootfile):
+        #Load the e/gamma spectrum from rootfile
         events = load_egamma.LoadEGamma(rootfile)
         print(events[0])
         indices = np.arange(len(events))
@@ -84,6 +85,8 @@ class SpectrumAna():
                 self.target_test.append(events[index][1])
 
     def AddModels(self):
+        #Add multiple models for comparison, look for the definition\
+        #of each model on sklearn documentation
         from sklearn.linear_model import LogisticRegression
         from sklearn.svm import SVC, LinearSVC
         from sklearn.neighbors import KNeighborsClassifier
@@ -109,6 +112,7 @@ class SpectrumAna():
         self.models = models
 
     def CompareModels(self):
+        #compare the efficiency of different models.
         results = []
         names = []
         models = self.models
@@ -122,6 +126,7 @@ class SpectrumAna():
             print(names[i],results[i].mean())
 
     def TrainModel(self, modelname):
+        #Train and save a specific model.
         if modelname not in self.models.keys():
             print('Model not supported yet!')
             sys.exit()
