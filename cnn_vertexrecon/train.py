@@ -127,13 +127,13 @@ if __name__ == "__main__":
     print('==> Preparing data..')
     list_of_datasets = []
     import glob
-    filelist = glob.glob('./*.json')
-    for j in filelist:
-        if not j.endswith('.json'):
-            continue  # skip non-json files
-        list_of_datasets.append(junodata.SingleJsonDataset(json_file=j, root_dir='./', transform=None))
+    filelist = glob.glob('./json_files/*.json')
+    #for j in filelist:
+    #    if not j.endswith('.json'):
+    #        continue  # skip non-json files
+    #    list_of_datasets.append(junodata.SingleJsonDataset(json_file=j, root_dir='./', transform=None))
     # once all single json datasets are created you can concat them into a single one:
-    multiple_json_dataset = data.ConcatDataset(list_of_datasets)
+    multiple_json_dataset = junodata.ListDataset(filelist, 500)
 
     # Creating data indices for training and validation splits:
     dataset_size = len(multiple_json_dataset)
@@ -149,8 +149,9 @@ if __name__ == "__main__":
     # Creating PT data samplers and loaders:
     train_sampler = SubsetRandomSampler(train_indices)
     validation_sampler = SubsetRandomSampler(val_indices)
-    train_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=train_sampler, num_workers=4)
-    validation_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=validation_sampler, num_workers=4)
+    train_loader = multiple_json_dataset
+    #train_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=train_sampler, num_workers=4)
+    #validation_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=validation_sampler, num_workers=4)
 
     lr = 1.0e-3
     momentum = 0.9
