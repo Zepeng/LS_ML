@@ -1,5 +1,4 @@
 import uproot as up
-import json
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
@@ -52,7 +51,7 @@ class PMTIDMap():
         xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)
         return(xbin, ybin)
 
-def roottojson(mapfile, rootfile, outfile=''):
+def roottonpz(mapfile, rootfile, outfile=''):
     # The csv file of PMT map must have the same tag as the MC production.
     pmtmap = PMTIDMap(mapfile)
     pmtmap.CalcDict()
@@ -65,6 +64,8 @@ def roottojson(mapfile, rootfile, outfile=''):
     npes   = uptree.array('npe')
     hittime= uptree.array('hittime')
     dataset = []
+    pmtinfos = []
+    vertices = []
     for i in range(len(pmtids)):
         #use a dictionary to save the array and vertex information
         eventdict = {}
@@ -76,14 +77,14 @@ def roottojson(mapfile, rootfile, outfile=''):
             event2dimg[1, xbin, ybin] += hittime[i][j]
         eventdict['pmtinfo'] = event2dimg.tolist()
         eventdict['vertex'] = np.array([initxs[i], initys[i], initzs[i]]).tolist()
+        pmtinfos.append(event2dimg)
+        vertices.append(np.array([initxs[i], initys[i], initzs[i]]))
         dataset.append(eventdict)
 
     if outfile == '':
-        with open('data_fake.json', 'w') as data_file:
-            json.dump(dataset, data_file)
+        np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), vertex=np.array(vertices))
     else:
-        with open(outfile, 'w') as data_file:
-            json.dump(dataset, data_file)
+        np.savez('out_0.npz', pmtinfo=np.array(pmtinfos), vertex=np.array(vertices))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
@@ -91,5 +92,5 @@ if __name__ == '__main__':
     parser.add_argument('--infile', '-i', type=str, help='Input root file.')
     parser.add_argument('--outfile', '-o', type=str, help='Output root file.')
     args = parser.parse_args()
-    roottojson(args.pmtmap, args.infile, args.outfile)
+    roottonpz(args.pmtmap, args.infile, args.outfile)
     #'/cvmfs/juno.ihep.ac.cn/sl6_amd64_gcc830/Pre-Release/J19v1r1-Pre4/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
