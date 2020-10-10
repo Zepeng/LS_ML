@@ -84,7 +84,7 @@ def roottonpz(mapfile, rootfile, outfile=''):
     if outfile == '':
         np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), vertex=np.array(vertices))
     else:
-        np.savez('out_0.npz', pmtinfo=np.array(pmtinfos), vertex=np.array(vertices))
+        np.savez(outfile, pmtinfo=np.array(pmtinfos), vertex=np.array(vertices))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
