@@ -52,6 +52,7 @@ def dist_acc(y_true, y_pred):
     accuracy defined as ratio of events with dist to real vertex
     less than 20 cm
     '''
+    print(y_true, y_pred)
     y_tr = y_true[:, 0:3]
     dists = torch.sum(torch.pow((y_tr - y_pred), 2), 1)
     acc = 0
@@ -127,7 +128,7 @@ if __name__ == "__main__":
     print('==> Preparing data..')
     list_of_datasets = []
     import glob
-    filelist = glob.glob('./json_files/*.json')
+    filelist = glob.glob('./*.npz')
     #for j in filelist:
     #    if not j.endswith('.json'):
     #        continue  # skip non-json files
@@ -149,9 +150,8 @@ if __name__ == "__main__":
     # Creating PT data samplers and loaders:
     train_sampler = SubsetRandomSampler(train_indices)
     validation_sampler = SubsetRandomSampler(val_indices)
-    train_loader = multiple_json_dataset
-    #train_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=train_sampler, num_workers=4)
-    #validation_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=validation_sampler, num_workers=4)
+    train_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=train_sampler, num_workers=4)
+    validation_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=validation_sampler, num_workers=4)
 
     lr = 1.0e-3
     momentum = 0.9
