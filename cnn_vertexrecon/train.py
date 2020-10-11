@@ -57,7 +57,7 @@ def dist_acc(y_true, y_pred):
     dists = torch.sum(torch.pow((y_tr - y_pred), 2), 1)
     acc = 0
     for dist in dists:
-        if dist < 40000:
+        if dist < 1000000:
             acc += 1
     return acc*1.0/len(y_true)
 
@@ -92,6 +92,7 @@ def test(testloader, epoch):
     score = []
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(testloader):
+            inputs, targets = inputs.reshape(inputs.shape[1:]), targets.reshape(targets.shape[1:])
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
             loss = mean_square_loss(outputs, targets)
@@ -123,22 +124,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch 1d conv net classifier')
     parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
+    parser.add_argument('--filedir', '-i', type=str, help='directory of dataset files.')
     args = parser.parse_args()
     transformations = transforms.Compose([transforms.ToTensor()])
     # Data
     print('==> Preparing data..')
     list_of_datasets = []
     import glob
-    filelist = glob.glob('./npz_files/*.npz')
-    #for j in filelist:
-    #    if not j.endswith('.json'):
-    #        continue  # skip non-json files
-    #    list_of_datasets.append(junodata.SingleJsonDataset(json_file=j, root_dir='./', transform=None))
-    # once all single json datasets are created you can concat them into a single one:
-    multiple_json_dataset = junodata.BatchDataset(filelist, 500)
+    filelist = glob.glob('%s/*.npz' % args.filedir)
+    batch_dataset = junodata.BatchDataset(filelist, 500)
 
     # Creating data indices for training and validation splits:
-    dataset_size = len(multiple_json_dataset)
+    dataset_size = len(batch_dataset)
     indices = list(range(dataset_size))
     validation_split = .2
     split = int(np.floor(validation_split * dataset_size))
@@ -151,8 +148,8 @@ if __name__ == "__main__":
     # Creating PT data samplers and loaders:
     train_sampler = SubsetRandomSampler(train_indices)
     validation_sampler = SubsetRandomSampler(val_indices)
-    train_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=1, sampler=train_sampler, num_workers=1)
-    validation_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=1, sampler=validation_sampler, num_workers=1)
+    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=train_sampler, num_workers=1)
+    validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=1)
 
     lr = 1.0e-3
     momentum = 0.9
@@ -181,7 +178,9 @@ if __name__ == "__main__":
     y_train_loss = np.zeros(100)
     y_train_acc = np.zeros(100)
     test_score = []
+    start_time = time.time()
     for epoch in range(start_epoch, start_epoch + 10):
+        epoch_start = time.time()
         # set the learning rate
         adjust_learning_rate(optimizer, epoch, lr)
         iterout = "Epoch [%d]: "%(epoch)
@@ -211,5 +210,8 @@ if __name__ == "__main__":
                 break
             print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,prec1,valid_loss))
             test_score.append(score)
+        epoch_elapse = time.time() - epoch_start
+        print('Epoch %d used %f time' % (epoch, epoch_elapse))
         print(y_train_loss, y_train_acc)
+    print('Total time used is %f' % time.time() - start_time)
         #np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
