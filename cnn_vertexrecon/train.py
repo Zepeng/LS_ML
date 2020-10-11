@@ -52,7 +52,7 @@ def dist_acc(y_true, y_pred):
     accuracy defined as ratio of events with dist to real vertex
     less than 20 cm
     '''
-    print(y_true, y_pred)
+    #print(y_true, y_pred)
     y_tr = y_true[:, 0:3]
     dists = torch.sum(torch.pow((y_tr - y_pred), 2), 1)
     acc = 0
@@ -68,6 +68,7 @@ def train(trainloader, epoch):
     train_acc =0
     total = 0
     for batch_idx, (inputs, targets) in enumerate(trainloader):
+        inputs, targets = inputs.reshape(inputs.shape[1:]), targets.reshape(targets.shape[1:])
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
@@ -128,13 +129,13 @@ if __name__ == "__main__":
     print('==> Preparing data..')
     list_of_datasets = []
     import glob
-    filelist = glob.glob('./*.npz')
+    filelist = glob.glob('./npz_files/*.npz')
     #for j in filelist:
     #    if not j.endswith('.json'):
     #        continue  # skip non-json files
     #    list_of_datasets.append(junodata.SingleJsonDataset(json_file=j, root_dir='./', transform=None))
     # once all single json datasets are created you can concat them into a single one:
-    multiple_json_dataset = junodata.ListDataset(filelist, 500)
+    multiple_json_dataset = junodata.BatchDataset(filelist, 500)
 
     # Creating data indices for training and validation splits:
     dataset_size = len(multiple_json_dataset)
@@ -150,8 +151,8 @@ if __name__ == "__main__":
     # Creating PT data samplers and loaders:
     train_sampler = SubsetRandomSampler(train_indices)
     validation_sampler = SubsetRandomSampler(val_indices)
-    train_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=train_sampler, num_workers=4)
-    validation_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=200, sampler=validation_sampler, num_workers=4)
+    train_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=1, sampler=train_sampler, num_workers=1)
+    validation_loader = torch.utils.data.DataLoader(multiple_json_dataset, batch_size=1, sampler=validation_sampler, num_workers=1)
 
     lr = 1.0e-3
     momentum = 0.9
