@@ -148,8 +148,8 @@ if __name__ == "__main__":
     # Creating PT data samplers and loaders:
     train_sampler = SubsetRandomSampler(train_indices)
     validation_sampler = SubsetRandomSampler(val_indices)
-    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=train_sampler, num_workers=1)
-    validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=1)
+    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=train_sampler, num_workers=4)
+    validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=4)
 
     lr = 1.0e-3
     momentum = 0.9
@@ -211,7 +211,7 @@ if __name__ == "__main__":
             print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,prec1,valid_loss))
             test_score.append(score)
         epoch_elapse = time.time() - epoch_start
-        print('Epoch %d used %f time' % (epoch, epoch_elapse))
+        print('Epoch %d used %f seconds' % (epoch, epoch_elapse))
         print(y_train_loss, y_train_acc)
-    print('Total time used is %f' % time.time() - start_time)
+    print('Total time used is %f seconds' % time.time() - start_time)
         #np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
