@@ -62,10 +62,10 @@ class BatchDataset(data.Dataset):
 
 def test():
     list_of_datasets = []
-    filelist = glob.glob('./out_0.npz')[:1000]
+    filelist = glob.glob('./npz_files/sample_0.npz')[:1000]
     dataset = BatchDataset(filelist, 500)
     print(dataset[0][0].shape)
     #print(i, dataset[i][0].shape)
 
-if __name__ == '__main__':
-    test()
+#if __name__ == '__main__':
+#test()

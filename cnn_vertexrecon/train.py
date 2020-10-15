@@ -41,25 +41,24 @@ def mean_square_loss(y_true, y_pred):
     '''
     y_tr = y_true[:, 0:3]
 
-    cross_entropy = torch.mean(torch.pow((y_tr - y_pred), 2), 1)
-    #cross_entropy = tf.pow(cross_entropy, 0.5)
+    cross_entropy = torch.sum(torch.pow((y_tr - y_pred), 2), 1)
+    cross_entropy = torch.pow(cross_entropy, 0.5)
     cross_entropy = torch.mean(cross_entropy)
-
-    return cross_entropy/len(y_tr)
+    return cross_entropy #/len(y_tr)
 
 def dist_acc(y_true, y_pred):
     '''
     accuracy defined as ratio of events with dist to real vertex
     less than 20 cm
     '''
-    #print(y_true, y_pred)
     y_tr = y_true[:, 0:3]
     dists = torch.sum(torch.pow((y_tr - y_pred), 2), 1)
+    dists = torch.pow(dists, 0.5)
     acc = 0
     for dist in dists:
-        if dist < 1000000:
+        if dist < 500:
             acc += 1
-    return acc*1.0/len(y_true)
+    return acc #*1.0/len(y_true)
 
 def train(trainloader, epoch):
     print('\nEpoch: %d' % epoch)
@@ -179,7 +178,7 @@ if __name__ == "__main__":
     y_train_acc = np.zeros(100)
     test_score = []
     start_time = time.time()
-    for epoch in range(start_epoch, start_epoch + 10):
+    for epoch in range(start_epoch, start_epoch + 20):
         epoch_start = time.time()
         # set the learning rate
         adjust_learning_rate(optimizer, epoch, lr)
@@ -213,5 +212,5 @@ if __name__ == "__main__":
         epoch_elapse = time.time() - epoch_start
         print('Epoch %d used %f seconds' % (epoch, epoch_elapse))
         print(y_train_loss, y_train_acc)
-    print('Total time used is %f seconds' % time.time() - start_time)
-        #np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
+        np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
+    print('Total time used is %f seconds' % (time.time() - start_time) )
