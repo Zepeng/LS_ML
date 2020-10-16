@@ -99,8 +99,8 @@ def test(testloader, epoch):
             total += targets.size(0)
             for m in range(outputs.size(0)):
                 score.append([outputs[m], targets[m]])
-                print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                        % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total))
+            print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
+                    % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total))
 
         # Save checkpoint.
         acc = 100.*test_acc/total
