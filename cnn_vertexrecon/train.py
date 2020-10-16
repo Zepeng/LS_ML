@@ -104,20 +104,20 @@ def test(testloader, epoch):
                 print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                         % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total))
 
-                # Save checkpoint.
-            acc = 100.*test_acc/total
-            if acc > best_acc:
-                print('Saving..')
-                state = {'net': net.state_dict(),
-                         'acc': acc,
-                         'epoch': epoch,
-                         }
-                if not os.path.isdir('checkpoint_sens' ):
-                    os.mkdir('checkpoint_sens' )
-                torch.save(state, './checkpoint_sens/ckpt_%d.t7' % epoch)
-                torch.save(state, './checkpoint_sens/ckpt.t7' )
-                best_acc = acc
-            return test_loss/len(testloader), 100.*test_acc/total, score
+        # Save checkpoint.
+        acc = 100.*test_acc/total
+        if acc > best_acc:
+            print('Saving..')
+            state = {'net': net.state_dict(),
+                    'acc': acc,
+                    'epoch': epoch,
+                    }
+            if not os.path.isdir('checkpoint_sens' ):
+                os.mkdir('checkpoint_sens' )
+            torch.save(state, './checkpoint_sens/ckpt_%d.t7' % epoch)
+            torch.save(state, './checkpoint_sens/ckpt.t7' )
+            best_acc = acc
+        return test_loss/len(testloader), 100.*test_acc/total, score
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch 1d conv net classifier')
