@@ -98,7 +98,7 @@ def test(testloader, epoch):
             test_loss += loss.item()
             total += targets.size(0)
             for m in range(outputs.size(0)):
-                score.append([outputs[m].cpu().numpy(), targets[m]].cpu().numpy())
+                score.append([outputs[m].cpu().numpy(), targets[m].cpu().numpy()])
             print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                     % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total))
 
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     # Creating data indices for training and validation splits:
     dataset_size = len(batch_dataset)
     indices = list(range(dataset_size))
-    validation_split = .2
+    validation_split = .1
     split = int(np.floor(validation_split * dataset_size))
     shuffle_dataset = True
     random_seed= 42
