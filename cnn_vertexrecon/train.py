@@ -98,7 +98,7 @@ def test(testloader, epoch):
             test_loss += loss.item()
             total += targets.size(0)
             for m in range(outputs.size(0)):
-                score.append([outputs[m], targets[m]])
+                score.append([outputs[m].cpu().numpy(), targets[m]].cpu().numpy())
             print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                     % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total))
 
