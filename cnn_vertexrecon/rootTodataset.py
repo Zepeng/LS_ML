@@ -13,7 +13,7 @@ class PMTIDMap():
     thetas = []
 
     #read the PMT map from the root file.
-    def __init__(self, csvmap):
+    def __edep__(self, csvmap):
         pmtcsv = open(csvmap, 'r')
         for line in pmtcsv:
             pmt_instance = (line.split())
@@ -58,33 +58,29 @@ def roottonpz(mapfile, rootfile, outfile=''):
 
     uptree = up.open(rootfile)['data']
     pmtids = uptree.array('pmtID')
-    initxs = uptree.array('initX')
-    initys = uptree.array('initY')
-    initzs = uptree.array('initZ')
+    edepxs = uptree.array('edepX')
+    edepys = uptree.array('edepY')
+    edepzs = uptree.array('edepZ')
+    edeps  = uptree.array('edep')
     npes   = uptree.array('npe')
     hittime= uptree.array('hittime')
-    dataset = []
     pmtinfos = []
     vertices = []
+
     for i in range(len(pmtids)):
-        #use a dictionary to save the array and vertex information
-        eventdict = {}
         #save charge and hittime to 3D array
         event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
         for j in range(len(pmtids[i])):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
             event2dimg[0, xbin, ybin] += npes[i][j]
             event2dimg[1, xbin, ybin] += hittime[i][j]
-        eventdict['pmtinfo'] = event2dimg.tolist()
-        eventdict['vertex'] = np.array([initxs[i], initys[i], initzs[i]]).tolist()
         pmtinfos.append(event2dimg)
-        vertices.append(np.array([initxs[i], initys[i], initzs[i]]))
-        dataset.append(eventdict)
+        vertices.append(np.array([edepxs[i], edepys[i], edepzs[i]]))
 
     if outfile == '':
         np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), vertex=np.array(vertices))
     else:
-        np.savez(outfile, pmtinfo=np.array(pmtinfos), vertex=np.array(vertices))
+        np.savez(outfile, pmtinfo=np.array(pmtinfos), vertex=np.array(vertices), edep=edeps)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
