@@ -64,7 +64,7 @@ def train(trainloader, epoch):
     train_loss = 0
     train_acc =0
     total = 0
-    for batch_idx, (inputs, targets) in enumerate(trainloader):
+    for batch_idx, (inputs, targets, spectators) in enumerate(trainloader):
         inputs, targets = inputs.reshape(inputs.shape[1:]), targets.reshape(targets.shape[1:])
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
@@ -88,8 +88,9 @@ def test(testloader, epoch):
     total = 0
     score = []
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(testloader):
+        for batch_idx, (inputs, targets, spectators) in enumerate(testloader):
             inputs, targets = inputs.reshape(inputs.shape[1:]), targets.reshape(targets.shape[1:])
+            spectators = spectators.reshape(spectators.shape[1:])
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
             loss = mean_square_loss(outputs, targets)
@@ -98,7 +99,7 @@ def test(testloader, epoch):
             test_loss += loss.item()
             total += targets.size(0)
             for m in range(outputs.size(0)):
-                score.append([outputs[m].cpu().numpy(), targets[m].cpu().numpy()])
+                score.append([outputs[m].cpu().numpy(), targets[m].cpu().numpy(), spectators[m].cpu().numpy()])
             print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                     % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total))
 
