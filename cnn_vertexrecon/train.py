@@ -153,6 +153,11 @@ if __name__ == "__main__":
 
     print('==> Building model..')
     net = resnet.resnet18()
+    #use DataParallel if multiple GPUs are available
+    # Do not use this until the dataloader is updated, current dataloader blows up the memory.
+    if torch.cuda.device_count() > 1:
+        print("Let's use ", torch.cuda.device_count(), " GPUs!")
+        net = torch.nn.DataParallel(net)
     # We use SGD
     optimizer = torch.optim.SGD(net.parameters(), lr, momentum=momentum, weight_decay=weight_decay)
 
