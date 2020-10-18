@@ -58,6 +58,11 @@ def dist_acc(y_true, y_pred):
             acc += 1
     return acc #*1.0/len(y_true)
 
+def flatten_batch(batch_arr):
+    ar_shape = np.asarray(batch_arr.shape)
+    ar_shape = np.insert(ar_shape[2:], 0, ar_shape[0]*ar_shape[1])
+    return batch_arr.reshape(tuple(ar_shape))
+
 def train(trainloader, epoch):
     print('\nEpoch: %d' % epoch)
     net.train()
@@ -65,7 +70,7 @@ def train(trainloader, epoch):
     train_acc =0
     total = 0
     for batch_idx, (inputs, targets, spectators) in enumerate(trainloader):
-        inputs, targets = inputs.reshape(inputs.shape[1:]), targets.reshape(targets.shape[1:])
+        inputs, targets = flatten_batch(inputs), flatten_batch(targets)
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
@@ -89,8 +94,8 @@ def test(testloader, epoch):
     score = []
     with torch.no_grad():
         for batch_idx, (inputs, targets, spectators) in enumerate(testloader):
-            inputs, targets = inputs.reshape(inputs.shape[1:]), targets.reshape(targets.shape[1:])
-            spectators = spectators.reshape(spectators.shape[1:])
+            inputs, targets = flatten_batch(inputs), flatten_batch(targets)
+            spectators = flatten_batch(spectators)
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
             loss = mean_square_loss(outputs, targets)
@@ -99,7 +104,7 @@ def test(testloader, epoch):
             test_loss += loss.item()
             total += targets.size(0)
             for m in range(outputs.size(0)):
-                score.append([outputs[m].cpu().numpy(), targets[m].cpu().numpy(), spectators[m].cpu().numpy()])
+                score.append([outputs[m].cpu().numpy(), targets[m].cpu().numpy(), spectators[m].numpy()])
             print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                     % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total))
 
@@ -146,7 +151,7 @@ if __name__ == "__main__":
     # Creating PT data samplers and loaders:
     train_sampler = SubsetRandomSampler(train_indices)
     validation_sampler = SubsetRandomSampler(val_indices)
-    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=train_sampler, num_workers=4)
+    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=2, sampler=train_sampler, num_workers=4)
     validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=4)
 
     lr = 1.0e-3
