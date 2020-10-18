@@ -1,20 +1,10 @@
 import torch
 import time
-import pandas as pd
 import numpy as np
 import os
 
 import torch
-import torch.nn as nn
-from torchvision import transforms
-from torchvision import models
-import torch.utils.data as data
-from torch.utils.data.dataset import Dataset  # For custom datasets
 from torch.utils.data.sampler import SubsetRandomSampler
-
-import torch.optim as optim
-import torch.nn.functional as F
-import torch.backends.cudnn as cudnn
 from torch.optim import lr_scheduler
 
 import argparse
@@ -129,7 +119,7 @@ if __name__ == "__main__":
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument('--filedir', '-i', type=str, help='directory of dataset files.')
     args = parser.parse_args()
-    transformations = transforms.Compose([transforms.ToTensor()])
+    #transformations = transforms.Compose([transforms.ToTensor()])
     # Data
     print('==> Preparing data..')
     list_of_datasets = []
