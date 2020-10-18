@@ -57,15 +57,17 @@ class BatchDataset(data.Dataset):
         batch = np.load(filename)
         pmtinfos = batch['pmtinfo'] #[idx % self.nevt_file]
         vertices = batch['vertex'] #[idx % self.nevt_file]
+        edeps    = batch['edep']
         return torch.from_numpy(np.array(pmtinfos)).to(torch.float32),\
-                torch.from_numpy(np.array(vertices)).to(torch.float32)
+                torch.from_numpy(np.array(vertices)).to(torch.float32),\
+                torch.from_numpy(np.array(edeps)).to(torch.float32)
 
 def test():
     list_of_datasets = []
     filelist = glob.glob('./npz_files/sample_0.npz')[:1000]
     dataset = BatchDataset(filelist, 500)
-    print(dataset[0][0].shape)
+    print(dataset[0][2].shape)
     #print(i, dataset[i][0].shape)
 
-#if __name__ == '__main__':
-#test()
+if __name__ == '__main__':
+    test()
