@@ -19,7 +19,6 @@ class PMTIDMap():
             pmt_instance = (line.split())
             self.pmtmap[str(pmt_instance[0])] = ( int(pmt_instance[0]), float(pmt_instance[1]), float(pmt_instance[2]), float(pmt_instance[3]), float(pmt_instance[4]), float(pmt_instance[5]))
         self.maxpmtid = len(self.pmtmap)
-        print(self.pmtmap)
 
     def IdToPos(self, pmtid):
         return self.pmtmap[str(pmtid)]
@@ -42,8 +41,6 @@ class PMTIDMap():
             thetaphi_dict[key] = np.sort(thetaphi_dict[key])
         self.thetaphi_dict = thetaphi_dict
         self.thetas = np.sort(thetas)
-        print(self.thetaphi_dict)
-        print(self.thetas.shape)
 
     def CalcBin(self, pmtid):
         if pmtid > self.maxpmtid:
@@ -54,7 +51,7 @@ class PMTIDMap():
         xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)
         return(xbin, ybin)
 
-def roottonpz(mapfile, rootfile, outfile='', eventtype='sig'):
+def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize = 100):
     # The csv file of PMT map must have the same tag as the MC production.
     pmtmap = PMTIDMap(mapfile)
     pmtmap.CalcDict()
@@ -64,26 +61,33 @@ def roottonpz(mapfile, rootfile, outfile='', eventtype='sig'):
     npes   = uptree.array('Charge')
     hittime= uptree.array('Time')
     edeps  = uptree.array('Edep')
-    pmtinfos = []
-    types = []
+    nbatches = int(len(pmtids)/batchsize)
+    if len(pmtids) > batchsize*nbatches:
+        nbatches += 1
 
-    for i in range(len(pmtids)):
-        #save charge and hittime to 3D array
-        event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
-        for j in range(len(pmtids[i])):
-            (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
-            event2dimg[0, xbin, ybin] += npes[i][j]
-            event2dimg[1, xbin, ybin] += hittime[i][j]
-        pmtinfos.append(event2dimg)
-        if eventtype == 'sig':
-            types.append(1)
+    for batch in range(nbatches):
+        pmtinfos = []
+        types = []
+        for batchentry in range(batchsize):
+            #save charge and hittime to 3D array
+            event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
+            i = batchsize*batch + batchentry
+            if i >= len(pmtids):
+                continue
+            for j in range(len(pmtids[i])):
+                (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
+                event2dimg[0, xbin, ybin] += npes[i][j]
+                event2dimg[1, xbin, ybin] += hittime[i][j]
+            pmtinfos.append(event2dimg)
+            if eventtype == 'sig':
+                types.append(1)
+            else:
+                types.append(0)
+
+        if outfile == '':
+            np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types))
         else:
-            types.append(0)
-
-    if outfile == '':
-        np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types))
-    else:
-        np.savez(outfile, pmtinfo=np.array(pmtinfos), eventtype=np.array(types), edep=edeps)
+            np.savez(outfile + str(batch) + '.npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types), edep=edeps)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
