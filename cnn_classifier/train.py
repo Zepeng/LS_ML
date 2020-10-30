@@ -3,9 +3,9 @@ import time
 import numpy as np
 import os
 
-import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.optim import lr_scheduler
+from torch import nn
 
 import argparse
 import junodata, vgg, resnet
@@ -35,11 +35,13 @@ def train(trainloader, epoch):
     train_acc =0
     correct = 0
     total = 0
+    m = nn.Softmax(dim=1)
     for batch_idx, (inputs, targets, spectators) in enumerate(trainloader):
         inputs, targets = flatten_batch(inputs), flatten_batch(targets)
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
+        outputs = m(outputs)
         loss = criterion(outputs, targets.long())
         loss.backward()
         optimizer.step()
@@ -48,7 +50,7 @@ def train(trainloader, epoch):
         correct += predicted.eq(targets).sum().item()
         total += targets.size(0)
         print(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+                % (train_loss/(batch_idx+1), 100.*correct/total, correct, total), end='\r')
     return train_loss/len(trainloader), 100.*correct/total
 
 def test(testloader, epoch):
@@ -58,12 +60,14 @@ def test(testloader, epoch):
     correct = 0
     total = 0
     score = []
+    m = nn.Softmax(dim=1)
     with torch.no_grad():
         for batch_idx, (inputs, targets, spectators) in enumerate(testloader):
             inputs, targets = flatten_batch(inputs), flatten_batch(targets)
             spectators = flatten_batch(spectators)
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
+            outputs = m(outputs)
             loss = criterion(outputs, targets.long())
             _, predicted = outputs.max(1)
             correct += predicted.eq(targets).sum().item()
@@ -72,7 +76,7 @@ def test(testloader, epoch):
             for m in range(outputs.size(0)):
                 score.append([outputs[m].cpu().numpy(), targets[m].cpu().numpy(), spectators[m].numpy()])
             print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                    % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+                    % (test_loss/(batch_idx+1), 100.*correct/total, correct, total), end='\r')
 
         # Save checkpoint.
         acc = 100.*correct/total

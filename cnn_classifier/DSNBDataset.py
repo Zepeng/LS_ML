@@ -97,4 +97,3 @@ if __name__ == '__main__':
     parser.add_argument('--eventtype', '-t', type=str, help='Event type.')
     args = parser.parse_args()
     roottonpz(args.pmtmap, args.infile, args.outfile, args.eventtype)
-    #'/cvmfs/juno.ihep.ac.cn/sl6_amd64_gcc830/Pre-Release/J19v1r1-Pre4/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
