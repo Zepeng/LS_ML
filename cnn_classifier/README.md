@@ -1,4 +1,4 @@
-#Convolutional neural network based event classifier
+# Convolutional neural network based event classifier
 This package is a event classifier based on convolutional neural network designed for event discrimination between atmospheric neutrino background and diffuse supernova neutrino events. The default network is a 18-layer ResNet.
 
 ## content of the package
