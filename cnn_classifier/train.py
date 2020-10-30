@@ -35,13 +35,13 @@ def train(trainloader, epoch):
     train_acc =0
     correct = 0
     total = 0
-    m = nn.Softmax(dim=1)
+    fsoftmax = nn.Softmax(dim=1)
     for batch_idx, (inputs, targets, spectators) in enumerate(trainloader):
         inputs, targets = flatten_batch(inputs), flatten_batch(targets)
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
-        outputs = m(outputs)
+        outputs = fsoftmax(outputs)
         loss = criterion(outputs, targets.long())
         loss.backward()
         optimizer.step()
@@ -60,14 +60,14 @@ def test(testloader, epoch):
     correct = 0
     total = 0
     score = []
-    m = nn.Softmax(dim=1)
+    fsoftmax = nn.Softmax(dim=1)
     with torch.no_grad():
         for batch_idx, (inputs, targets, spectators) in enumerate(testloader):
             inputs, targets = flatten_batch(inputs), flatten_batch(targets)
             spectators = flatten_batch(spectators)
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
-            outputs = m(outputs)
+            outputs = fsoftmax(outputs)
             loss = criterion(outputs, targets.long())
             _, predicted = outputs.max(1)
             correct += predicted.eq(targets).sum().item()
@@ -157,6 +157,8 @@ if __name__ == "__main__":
         start_epoch = checkpoint['epoch'] + 1
     y_train_loss = np.zeros(100)
     y_train_acc = np.zeros(100)
+    y_test_loss = np.zeros(100)
+    y_test_acc  = np.zeros(100)
     test_score = []
     start_time = time.time()
     for epoch in range(start_epoch, start_epoch + 20):
@@ -181,17 +183,20 @@ if __name__ == "__main__":
 
             # evaluate on validationset
             try:
-                valid_loss,prec1, score = test(validation_loader, epoch)
+                test_loss,test_acc, score = test(validation_loader, epoch)
             except Exception as e:
                 print("Error in validation routine!")
                 print(e.message)
                 print(e.__class__.__name__)
                 traceback.print_exc(e)
                 break
-            print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,prec1,valid_loss))
+            print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,test_acc,test_loss))
+            y_test_loss[epoch] = test_loss
+            y_test_acc[epoch] = test_acc
             test_score.append(score)
         epoch_elapse = time.time() - epoch_start
         print('Epoch %d used %f seconds' % (epoch, epoch_elapse))
         print(y_train_loss, y_train_acc)
         np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
+    np.save('loss_acc.npy', np.array([y_train_loss, y_train_acc, y_test_loss, y_test_acc]))
     print('Total time used is %f seconds' % (time.time() - start_time) )
