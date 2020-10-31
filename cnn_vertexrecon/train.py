@@ -10,7 +10,6 @@ from torch.optim import lr_scheduler
 import argparse
 import junodata, vgg, resnet
 
-
 device = 'cuda'
 if torch.cuda.is_available():
     device = 'cuda'
@@ -127,26 +126,35 @@ if __name__ == "__main__":
     import glob
     filelist = glob.glob('%s/*.npz' % args.filedir)
     batch_dataset = junodata.BatchDataset(filelist, 500)
-    print(filelist)
 
-    print(batch_dataset)
-    # # Creating data indices for training and validation splits:
-    # dataset_size = len(batch_dataset)
-    # indices = list(range(dataset_size))
-    # validation_split = .1
-    # split = int(np.floor(validation_split * dataset_size))
-    # shuffle_dataset = True
-    # random_seed= 42
-    # if shuffle_dataset :
-    #     np.random.seed(random_seed)
-    #     np.random.shuffle(indices)
-    #     train_indices, val_indices = indices[split:], indices[:split]
-    # # Creating PT data samplers and loaders:
-    # train_sampler = SubsetRandomSampler(train_indices)
-    # validation_sampler = SubsetRandomSampler(val_indices)
-    # train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=2, sampler=train_sampler, num_workers=4)
-    # validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=4)
-    #
+    # Creating data indices for training and validation splits:
+    dataset_size = len(batch_dataset)
+    indices = list(range(dataset_size))
+    validation_split = .1   #set 10% data as validation set
+    split = int(np.floor(validation_split * dataset_size))
+    shuffle_dataset = True
+    random_seed= 42
+    if shuffle_dataset :
+        np.random.seed(random_seed)
+        np.random.shuffle(indices)
+        train_indices, val_indices = indices[split:], indices[:split]
+    # Creating PT data samplers and loaders:
+    train_sampler = SubsetRandomSampler(train_indices)  #why use SubsetRandomSampler here: comparing with random_split() ,it is able\
+                                                        # to ensure echo batch sees a proportional number of all classes
+    validation_sampler = SubsetRandomSampler(val_indices) #we can show the indexs of the Sampler by Sampler.indexs ,it is the indexs about the filelist
+
+    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=2, sampler=train_sampler, num_workers=4)
+    validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=4)
+
+    print("batch size:  ",train_loader.batch_size)
+    print("dataset:",train_loader.dataset)
+    print("train_loader:  ", len(train_loader))
+    # print(next(iter(train_loader))[0])
+    for i, data in enumerate(train_loader,0):
+        inputs, labels = data
+        inputs, labels = Variable(inputs), Valriable(labels)
+        print(inputs,labels)
+
     # lr = 1.0e-3
     # momentum = 0.9
     # weight_decay = 1.0e-3

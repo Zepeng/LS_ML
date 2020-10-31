@@ -39,3 +39,4 @@ if __name__ == "__main__":
     checkpoint = torch.load(args.netpath, map_location=torch.device('cpu') )
     net.load_state_dict(checkpoint['net'])
 
+
