@@ -1,9 +1,12 @@
+from typing import Any
+
 import torch
 import time
 import numpy as np
 import os
 
 import torch
+from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.optim import lr_scheduler
 
@@ -15,6 +18,7 @@ if torch.cuda.is_available():
     device = 'cuda'
 else:
     device = 'cpu'
+
 best_acc = 0 # best test accuracy
 
 def adjust_learning_rate(optimizer, epoch, lr):
@@ -143,84 +147,80 @@ if __name__ == "__main__":
                                                         # to ensure echo batch sees a proportional number of all classes
     validation_sampler = SubsetRandomSampler(val_indices) #we can show the indexs of the Sampler by Sampler.indexs ,it is the indexs about the filelist
 
-    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=2, sampler=train_sampler, num_workers=4)
+    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=2, sampler=train_sampler, num_workers=4) #we can use next(iter(train_loader)) to get the dataset which is junodata.BatchDataset in batch
     validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=4)
 
-    print("batch size:  ",train_loader.batch_size)
-    print("dataset:",train_loader.dataset)
-    print("train_loader:  ", len(train_loader))
-    # print(next(iter(train_loader))[0])
-    for i, data in enumerate(train_loader,0):
-        inputs, labels = data
-        inputs, labels = Variable(inputs), Valriable(labels)
-        print(inputs,labels)
+    # dataiter=iter(train_loader)
+    # print(next(dataiter))
 
-    # lr = 1.0e-3
-    # momentum = 0.9
-    # weight_decay = 1.0e-3
-    # batchsize = 50
-    # batchsize_valid = 500
-    # start_epoch = 0
-    #
-    # print('==> Building model..')
-    # net = resnet.resnet18()
-    # #use DataParallel if multiple GPUs are available
-    # # Do not use this until the dataloader is updated, current dataloader blows up the memory.
-    # if torch.cuda.device_count() > 1:
-    #     print("Let's use ", torch.cuda.device_count(), " GPUs!")
-    #     net = torch.nn.DataParallel(net)
-    # # We use SGD
-    # optimizer = torch.optim.SGD(net.parameters(), lr, momentum=momentum, weight_decay=weight_decay)
-    #
-    # net = net.to(device)
-    # if args.resume and os.path.exists('./checkpoint_sens/ckpt.t7'):
-    #     # Load checkpoint.
-    #     print('==> Resuming from checkpoint..')
-    #     assert os.path.isdir('checkpoint_sens'), 'Error: no checkpoint directory found!'
-    #     if device == 'cuda':
-    #         checkpoint = torch.load('./checkpoint_sens/ckpt.t7' )
-    #     else:
-    #         checkpoint = torch.load('./checkpoint_sens/ckpt.t7', map_location=torch.device('cpu') )
-    #     net.load_state_dict(checkpoint['net'])
-    #     best_acc = checkpoint['acc']
-    #     start_epoch = checkpoint['epoch'] + 1
-    # y_train_loss = np.zeros(100)
-    # y_train_acc = np.zeros(100)
-    # test_score = []
-    # start_time = time.time()
-    # for epoch in range(start_epoch, start_epoch + 20):
-    #     epoch_start = time.time()
-    #     # set the learning rate
-    #     adjust_learning_rate(optimizer, epoch, lr)
-    #     iterout = "Epoch [%d]: "%(epoch)
-    #     for param_group in optimizer.param_groups:
-    #         iterout += "lr=%.3e"%(param_group['lr'])
-    #         print(iterout)
-    #         try:
-    #             train_ave_loss, train_ave_acc = train(train_loader, epoch)
-    #         except Exception as e:
-    #             print("Error in training routine!")
-    #             print(e.message)
-    #             print(e.__class__.__name__)
-    #             traceback.print_exc(e)
-    #             break
-    #         print("Epoch [%d] train aveloss=%.3f aveacc=%.3f"%(epoch,train_ave_loss,train_ave_acc))
-    #         y_train_loss[epoch] = train_ave_loss
-    #         y_train_acc[epoch]  = train_ave_acc
-    #
-    #         # evaluate on validationset
-    #         try:
-    #             valid_loss,prec1, score = test(validation_loader, epoch)
-    #         except Exception as e:
-    #             print("Error in validation routine!")
-    #             print(e.message)
-    #             print(e.__class__.__name__)
-    #             traceback.print_exc(e)
-    #             break
-    #         print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,prec1,valid_loss))
-    #         test_score.append(score)
-    #     epoch_elapse = time.time() - epoch_start
-    #     print('Epoch %d used %f seconds' % (epoch, epoch_elapse))
-    #     print(y_train_loss, y_train_acc)
-    #     np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
-    # print('Total time used is %f seconds' % (time.time() - start_time) )
+    lr = 1.0e-3
+    momentum = 0.9
+    weight_decay = 1.0e-3
+    batchsize = 50
+    batchsize_valid = 500
+    start_epoch = 0
+
+    print('==> Building model..')
+    net = resnet.resnet18()
+    #use DataParallel if multiple GPUs are available
+    # Do not use this until the dataloader is updated, current dataloader blows up the memory.
+    if torch.cuda.device_count() > 1:
+        print("Let's use ", torch.cuda.device_count(), " GPUs!")
+        net = torch.nn.DataParallel(net)
+    # We use SGD
+    optimizer = torch.optim.SGD(net.parameters(), lr, momentum=momentum, weight_decay=weight_decay)
+
+    net = net.to(device)
+    if args.resume and os.path.exists('./checkpoint_sens/ckpt.t7'):
+        # Load checkpoint.
+        print('==> Resuming from checkpoint..')
+        assert os.path.isdir('checkpoint_sens'), 'Error: no checkpoint directory found!'
+        if device == 'cuda':
+            checkpoint = torch.load('./checkpoint_sens/ckpt.t7' )
+        else:
+            checkpoint = torch.load('./checkpoint_sens/ckpt.t7', map_location=torch.device('cpu') )
+        net.load_state_dict(checkpoint['net'])
+        best_acc = checkpoint['acc']
+        start_epoch = checkpoint['epoch'] + 1
+    y_train_loss = np.zeros(100)
+    y_train_acc = np.zeros(100)
+    test_score = []
+    start_time = time.time()
+    for epoch in range(start_epoch, start_epoch + 20):
+        epoch_start = time.time()
+        # set the learning rate
+        adjust_learning_rate(optimizer, epoch, lr)
+        iterout = "Epoch [%d]: "%(epoch)
+        for param_group in optimizer.param_groups:
+            print(param_group)
+            iterout += "lr=%.3e"%(param_group['lr'])
+            print(iterout)
+            try:
+                train_ave_loss, train_ave_acc = train(train_loader, epoch)
+            except Exception as e:
+                print("Error in training routine!")
+                print(e.message)
+                print(e.__class__.__name__)
+                traceback.print_exc(e)
+                break
+            print("Epoch [%d] train aveloss=%.3f aveacc=%.3f"%(epoch,train_ave_loss,train_ave_acc))
+            y_train_loss[epoch] = train_ave_loss
+            y_train_acc[epoch]  = train_ave_acc
+
+
+            # evaluate on validationset
+            try:
+                valid_loss,prec1, score = test(validation_loader, epoch)
+            except Exception as e:
+                print("Error in validation routine!")
+                print(e.message)
+                print(e.__class__.__name__)
+                traceback.print_exc(e)
+                break
+            print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,prec1,valid_loss))
+            test_score.append(score)
+        epoch_elapse = time.time() - epoch_start
+        print('Epoch %d used %f seconds' % (epoch, epoch_elapse))
+        print(y_train_loss, y_train_acc)
+        np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
+    print('Total time used is %f seconds' % (time.time() - start_time) )
