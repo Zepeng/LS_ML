@@ -112,7 +112,7 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
     edep_batch = []
     for batchentry in range(int(batchsize/2)):
         #save charge and hittime to 3D array
-        i = batchsize*batch_num + batchentry
+        i = int*(batchsize/2)*batch_num + batchentry
         if i >= sigchain.GetEntries() or i >= bkgchain.GetEntries():
             continue
         sigchain.GetEntry(i)
