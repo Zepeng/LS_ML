@@ -49,7 +49,7 @@ class PMTIDMap():
             return (0, 0)
         (pmtid, x, y, z, theta, phi) = self.pmtmap[str(pmtid)]
         ybin = np.where(self.thetas == theta)[0]
-        xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)
+        xbin = int(theta*128./360)
         return(xbin, ybin)
 
 def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize = 100):
@@ -72,7 +72,7 @@ def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize = 100):
         eqen_batch = []
         for batchentry in range(batchsize):
             #save charge and hittime to 3D array
-            event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
+            event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
             i = batchsize*batch + batchentry
             if i >= len(pmtids):
                 continue
@@ -108,7 +108,7 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
     vertices = []
     for batchentry in range(int(batchsize/2)):
         #save charge and hittime to 3D array
-        i = int*(batchsize/2)*batch_num + batchentry
+        i = int(batchsize/2)*batch_num + batchentry
         if i >= sigchain.GetEntries() or i >= bkgchain.GetEntries():
             continue
         sigchain.GetEntry(i)
@@ -117,7 +117,7 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
         npes = sigchain.Charge
         hittime = sigchain.Time
         eqen = sigchain.eqen
-        event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
+        event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             event2dimg[0, xbin, ybin] += npes[j]
@@ -130,7 +130,7 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
         npes = bkgchain.Charge
         hittime = bkgchain.Time
         eqen = bkgchain.eqen
-        event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
+        event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             event2dimg[0, xbin, ybin] += npes[j]
