@@ -79,7 +79,10 @@ def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize = 100):
             for j in range(len(pmtids[i])):
                 (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
                 event2dimg[0, xbin, ybin] += npes[i][j]
-                event2dimg[1, xbin, ybin] += hittime[i][j]
+                if event2dimg[1, xbin, ybin] ==0:
+                    event2dimg[1, xbin, ybin]
+                else:
+                    event2dimg[1, xbin, ybin] = min(hittime[i][j], event2dimg[1, xbin, ybin])
             pmtinfos.append(event2dimg)
             if eventtype == 'sig':
                 types.append(1)
@@ -121,7 +124,10 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             event2dimg[0, xbin, ybin] += npes[j]
-            event2dimg[1, xbin, ybin] += hittime[j]
+            if event2dimg[1, xbin, ybin] ==0:
+                event2dimg[1, xbin, ybin]
+            else:
+                event2dimg[1, xbin, ybin] = min(hittime[i][j], event2dimg[1, xbin, ybin])
         pmtinfos.append(event2dimg)
         types.append(1)
         eqen_batch.append(eqen)
@@ -134,7 +140,10 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             event2dimg[0, xbin, ybin] += npes[j]
-            event2dimg[1, xbin, ybin] += hittime[j]
+            if event2dimg[1, xbin, ybin] ==0:
+                event2dimg[1, xbin, ybin]
+            else:
+                event2dimg[1, xbin, ybin] = min(hittime[i][j], event2dimg[1, xbin, ybin])
         pmtinfos.append(event2dimg)
         types.append(0)
         vertices.append([bkgchain.X, bkgchain.Y, bkgchain.Z])
