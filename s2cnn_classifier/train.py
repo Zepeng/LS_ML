@@ -8,7 +8,7 @@ from torch.optim import lr_scheduler
 from torch import nn
 
 import argparse
-import junodata, vgg, resnet
+import junodata, model, model_identity
 
 device = 'cuda'
 if torch.cuda.is_available():
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     start_epoch = 0
 
     print('==> Building model..')
-    net = resnet.resnet18()
+    net = model_identity.Model(2)
     # define loss function (criterion) and optimizer
     criterion = torch.nn.CrossEntropyLoss().cuda()
     #use DataParallel if multiple GPUs are available
