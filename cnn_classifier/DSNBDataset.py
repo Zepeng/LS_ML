@@ -108,7 +108,7 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
     vertices = []
     for batchentry in range(int(batchsize/2)):
         #save charge and hittime to 3D array
-        i = int*(batchsize/2)*batch_num + batchentry
+        i = int(batchsize/2)*batch_num + batchentry
         if i >= sigchain.GetEntries() or i >= bkgchain.GetEntries():
             continue
         sigchain.GetEntry(i)
@@ -116,7 +116,7 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
         pmtids = sigchain.PMTID
         npes = sigchain.Charge
         hittime = sigchain.Time
-        eqen = sigchain.eqen
+        eqen = sigchain.Eqen
         event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
@@ -129,7 +129,7 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
         pmtids = bkgchain.PMTID
         npes = bkgchain.Charge
         hittime = bkgchain.Time
-        eqen = bkgchain.eqen
+        eqen = bkgchain.Eqen
         event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
