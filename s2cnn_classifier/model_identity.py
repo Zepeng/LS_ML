@@ -52,4 +52,4 @@ def test():
     model = Model(2)
     inputs = torch.rand(1, 2, 128, 128)
     print(model(inputs))
-test()
+#test()

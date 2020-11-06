@@ -9,8 +9,8 @@ class Model(nn.Module):
     def __init__(self, nclasses):
         super().__init__()
 
-        self.features = [6,  100, 100, nclasses]
-        self.bandwidths = [64, 16, 10]
+        self.features = [2,  50, 70, 350, nclasses]
+        self.bandwidths = [64, 16, 10, 10]
 
         assert len(self.bandwidths) == len(self.features) - 1
 
@@ -50,6 +50,6 @@ class Model(nn.Module):
 
 def test():
     model = Model(2)
-    inputs = torch.rand(1, 6, 128, 128)
+    inputs = torch.rand(1, 2, 128, 128)
     print(model(inputs))
-test()
+#test()
