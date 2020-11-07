@@ -48,8 +48,9 @@ class PMTIDMap():
             print('Wrong PMT ID')
             return (0, 0)
         (pmtid, x, y, z, theta, phi) = self.pmtmap[str(pmtid)]
-        ybin = np.where(self.thetas == theta)[0]
-        xbin = int(theta*128./360)
+        xbin = int(phi*128./360) #np.where(self.thetas == theta)[0]
+        ybin = int(theta*128./180)
+        print(pmtid, x, y, z, theta, phi, xbin, ybin)
         return(xbin, ybin)
 
 def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize = 100):
