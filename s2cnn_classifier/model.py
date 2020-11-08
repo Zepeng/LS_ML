@@ -9,8 +9,8 @@ class Model(nn.Module):
     def __init__(self, nclasses):
         super().__init__()
 
-        self.features = [2,  50, 70, 350, nclasses]
-        self.bandwidths = [64, 16, 10, 10]
+        self.features = [2,  100, 100, nclasses]
+        self.bandwidths = [64, 16, 10]
 
         assert len(self.bandwidths) == len(self.features) - 1
 

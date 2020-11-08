@@ -55,12 +55,12 @@ class BatchDataset(data.Dataset):
     def __getitem__(self, idx):
         filename = self.filelist[idx]
         batch = np.load(filename)
-        pmtinfos = batch['pmtinfo'] #[idx % self.nevt_file]
-        types = batch['eventtype'] #[idx % self.nevt_file]
-        edeps    = batch['edep']
+        pmtinfos = batch['pmtinfo'][:200] #[idx % self.nevt_file]
+        types = batch['eventtype'][:200] #[idx % self.nevt_file]
+        eqens    = batch['eqen'][:200]
         return torch.from_numpy(np.array(pmtinfos)).to(torch.float32),\
                 torch.from_numpy(np.array(types)).to(torch.float32),\
-                torch.from_numpy(np.array(edeps)).to(torch.float32)
+                torch.from_numpy(np.array(eqens)).to(torch.float32)
 
 def test():
     list_of_datasets = []

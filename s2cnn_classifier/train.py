@@ -8,7 +8,7 @@ from torch.optim import lr_scheduler
 from torch import nn
 
 import argparse
-import junodata, model, model_identity
+import junodata, model, model_identity, s2net
 
 device = 'cuda'
 if torch.cuda.is_available():
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=train_sampler, num_workers=4)
     validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=4)
 
-    lr = 1.0e-3
+    lr = 0.1
     momentum = 0.9
     weight_decay = 1.0e-3
     batchsize = 50
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     start_epoch = 0
 
     print('==> Building model..')
-    net = model_identity.Model(2)
+    net = model.Model(2)
     # define loss function (criterion) and optimizer
     criterion = torch.nn.CrossEntropyLoss().cuda()
     #use DataParallel if multiple GPUs are available
