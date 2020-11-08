@@ -125,8 +125,8 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             event2dimg[0, xbin, ybin] += npes[j]
-            if event2dimg[1, xbin, ybin] ==0:
-                event2dimg[1, xbin, ybin]
+            if event2dimg[1, xbin, ybin] < 0.1:
+                event2dimg[1, xbin, ybin] = hittime[i][j]
             else:
                 event2dimg[1, xbin, ybin] = min(hittime[i][j], event2dimg[1, xbin, ybin])
         pmtinfos.append(event2dimg)
@@ -141,8 +141,8 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             event2dimg[0, xbin, ybin] += npes[j]
-            if event2dimg[1, xbin, ybin] ==0:
-                event2dimg[1, xbin, ybin]
+            if event2dimg[1, xbin, ybin] < 0.1:
+                event2dimg[1, xbin, ybin] = hittime[i][j]
             else:
                 event2dimg[1, xbin, ybin] = min(hittime[i][j], event2dimg[1, xbin, ybin])
         pmtinfos.append(event2dimg)
