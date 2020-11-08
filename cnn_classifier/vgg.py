@@ -34,7 +34,7 @@ class VGG(nn.Module):
             nn.Linear(4096, 4096),
             nn.ReLU(True),
             nn.Dropout(),
-            nn.Linear(4096, 3),
+            nn.Linear(4096, 2),
         )
         if init_weights:
             self._initialize_weights()
@@ -187,4 +187,4 @@ def test():
     x = torch.rand(1, 2, 225, 125)
     print(x.dtype)
     print(net(x))
-#test()
+test()
