@@ -13,7 +13,7 @@ class PMTIDMap():
     thetas = []
 
     #read the PMT map from the root file.
-    def __edep__(self, csvmap):
+    def __init__(self, csvmap):
         pmtcsv = open(csvmap, 'r')
         for line in pmtcsv:
             pmt_instance = (line.split())
