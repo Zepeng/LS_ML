@@ -67,7 +67,7 @@ class BasicBlock(nn.Module):
         if self.downsample is not None:
             identity = self.downsample(x)
 
-        out += identity
+        out += identity  #ResNet feature
         out = self.relu(out)
 
         return out

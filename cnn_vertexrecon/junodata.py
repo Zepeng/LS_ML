@@ -67,11 +67,6 @@ class BatchDataset(data.Dataset):
         pmtinfos = batch['pmtinfo']  # [idx % self.nevt_file]
         vertices = batch['vertex']  # [idx % self.nevt_file]
         edeps = batch['edep']
-        # print("pmtinfos:   ", pmtinfos[:1])
-        # print("pmtinfos id0:", pmtinfos[0][0][0])
-        # print("vertices:   ", vertices[:1])
-        # print("edeps:      ", edeps[:1])
-        # print("pmtinfos.shape:",pmtinfos.shape)
         return torch.from_numpy(np.array(pmtinfos)).to(torch.float32), \
                torch.from_numpy(np.array(vertices)).to(torch.float32), \
                torch.from_numpy(np.array(edeps)).to(torch.float32)

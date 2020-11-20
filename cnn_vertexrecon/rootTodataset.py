@@ -13,7 +13,7 @@ class PMTIDMap():
     thetas = []
 
     #read the PMT map from the root file.
-    def __edep__(self, csvmap):
+    def __init__(self, csvmap):
         pmtcsv = open(csvmap, 'r')
         for line in pmtcsv:
             pmt_instance = (line.split())
@@ -47,11 +47,14 @@ class PMTIDMap():
             print('Wrong PMT ID')
             return (0, 0)
         (pmtid, x, y, z, theta, phi) = self.pmtmap[str(pmtid)]
+        # Using xbin and ybin, PMTs can be mapped into a image, which like a oval
         ybin = np.where(self.thetas == theta)[0]
-        xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)
+        xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)# When the theta is close to pi/2, we got the max length of phis
+
         return(xbin, ybin)
 
 def roottonpz(mapfile, rootfile, outfile=''):
+    print(mapfile)
     # The csv file of PMT map must have the same tag as the MC production.
     pmtmap = PMTIDMap(mapfile)
     pmtmap.CalcDict()
@@ -84,7 +87,8 @@ def roottonpz(mapfile, rootfile, outfile=''):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
-    parser.add_argument('--pmtmap', type=str, help='csc file of PMT map in JUNO.')
+    parser.add_argument('--pmtmap', type=str, help='csc file of PMT map in JUNO.',\
+                        default="/cvmfs/juno.ihep.ac.cn/sl6_amd64_gcc830/Pre-Release/J19v1r1-Pre4/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv")
     parser.add_argument('--infile', '-i', type=str, help='Input root file.')
     parser.add_argument('--outfile', '-o', type=str, help='Output root file.')
     args = parser.parse_args()

@@ -9,7 +9,6 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.optim import lr_scheduler
-
 import argparse
 import junodata, vgg, resnet
 
@@ -46,14 +45,16 @@ def dist_acc(y_true, y_pred):
     y_tr = y_true[:, 0:3]
     dists = torch.sum(torch.pow((y_tr - y_pred), 2), 1)
     dists = torch.pow(dists, 0.5)
+    dist_mean = torch.mean( dists )
     acc = 0
     for dist in dists:
         if dist < 500:
             acc += 1
-    return acc #*1.0/len(y_true)
+    return (acc,dist_mean) #*1.0/len(y_true)
 
 def flatten_batch(batch_arr):
     ar_shape = np.asarray(batch_arr.shape)
+    # ar_shape before inserting : [  1 500   2 225 124]
     ar_shape = np.insert(ar_shape[2:], 0, ar_shape[0]*ar_shape[1])
     return batch_arr.reshape(tuple(ar_shape))
 
@@ -64,19 +65,21 @@ def train(trainloader, epoch):
     train_acc =0
     total = 0
     for batch_idx, (inputs, targets, spectators) in enumerate(trainloader):
+        # the shape of inputs is [1, 500, 2, 225, 124], the shape of targets is [1, 500, 3]
         inputs, targets = flatten_batch(inputs), flatten_batch(targets)
+        # After flattening, Inputs shape: [500, 2, 225, 124],targets shape: [500, 3]
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
         loss = mean_square_loss(outputs, targets)
-        acc = dist_acc(outputs, targets)
+        ( acc, bias_mean) = dist_acc(outputs, targets)
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
         train_acc += acc
         total += targets.size(0)
-        print(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                % (train_loss/(batch_idx+1), 100.*train_acc/total, train_acc, total))
+        print(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d) | Bias Dist: %.3f'
+                % (train_loss/(batch_idx+1), 100.*train_acc/total, train_acc, total, bias_mean))
     return train_loss/len(trainloader), 100.*train_acc/total
 
 def test(testloader, epoch):
@@ -93,14 +96,14 @@ def test(testloader, epoch):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
             loss = mean_square_loss(outputs, targets)
-            acc = dist_acc(outputs, targets)
+            ( acc, bias_mean) = dist_acc(outputs, targets)
             test_acc += acc
             test_loss += loss.item()
             total += targets.size(0)
             for m in range(outputs.size(0)):
                 score.append([outputs[m].cpu().numpy(), targets[m].cpu().numpy(), spectators[m].numpy()])
-            print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                    % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total))
+            print(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)| Bias Dist: %.3f'
+                    % (test_loss/(batch_idx+1), 100.*test_acc/total, test_acc, total, bias_mean))
 
         # Save checkpoint.
         acc = 100.*test_acc/total
@@ -120,7 +123,7 @@ def test(testloader, epoch):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch 1d conv net classifier')
     parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
-    parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
+    parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint', default=False)
     parser.add_argument('--filedir', '-i', type=str, help='directory of dataset files.')
     args = parser.parse_args()
     #transformations = transforms.Compose([transforms.ToTensor()])
@@ -147,7 +150,7 @@ if __name__ == "__main__":
                                                         # to ensure echo batch sees a proportional number of all classes
     validation_sampler = SubsetRandomSampler(val_indices) #we can show the indexs of the Sampler by Sampler.indexs ,it is the indexs about the filelist
 
-    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=2, sampler=train_sampler, num_workers=4) #we can use next(iter(train_loader)) to get the dataset which is junodata.BatchDataset in batch
+    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=train_sampler, num_workers=4) #we can use next(iter(train_loader)) to get the dataset which is junodata.BatchDataset in batch
     validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=4)
 
     # dataiter=iter(train_loader)
@@ -184,6 +187,7 @@ if __name__ == "__main__":
         start_epoch = checkpoint['epoch'] + 1
     y_train_loss = np.zeros(100)
     y_train_acc = np.zeros(100)
+
     test_score = []
     start_time = time.time()
     for epoch in range(start_epoch, start_epoch + 20):
@@ -192,7 +196,6 @@ if __name__ == "__main__":
         adjust_learning_rate(optimizer, epoch, lr)
         iterout = "Epoch [%d]: "%(epoch)
         for param_group in optimizer.param_groups:
-            print(param_group)
             iterout += "lr=%.3e"%(param_group['lr'])
             print(iterout)
             try:
