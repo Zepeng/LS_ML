@@ -53,28 +53,48 @@ class PMTIDMap():
 
         return(xbin, ybin)
 
-def roottonpz(mapfile, rootfile, outfile=''):
-    print(mapfile)
+def roottonpz(mapfile, rootfile:str, outfile='', isUserDetsim:bool=False):
+    print("input rootfile:      ",rootfile)
+    print("mapfile:     ",mapfile)
     # The csv file of PMT map must have the same tag as the MC production.
     pmtmap = PMTIDMap(mapfile)
     pmtmap.CalcDict()
 
-    uptree = up.open(rootfile)['data']
+    basename_rootfile = rootfile.split('/')[-1]
+    if "user-detsim" in basename_rootfile :
+        isUserDetsim = True
+
+    if isUserDetsim:
+        name_tree = "evt"
+        name_branch_hittime = "hitTime"
+        name_branch_nPE = "nPE"
+    else:
+        name_tree = "data"
+        name_branch_hittime = "hittime"
+        name_branch_nPE = "npe"
+
+    uptree = up.open(rootfile)[name_tree]
     pmtids = uptree.array('pmtID')
     edepxs = uptree.array('edepX')
     edepys = uptree.array('edepY')
     edepzs = uptree.array('edepZ')
     edeps  = uptree.array('edep')
-    npes   = uptree.array('npe')
-    hittime= uptree.array('hittime')
+    npes   = uptree.array(name_branch_nPE)
+    hittime= uptree.array(name_branch_hittime)
+
     pmtinfos = []
     vertices = []
 
     for i in range(len(pmtids)):
         #save charge and hittime to 3D array
-        event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
+        # event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
+        event2dimg = np.zeros((2, 225, len(pmtmap.thetas) ), dtype=np.float16)
         for j in range(len(pmtids[i])):
+            if pmtids[i][j]>17612:
+                continue
             (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
+            # if ybin>124:
+            #     print(pmtids[i][j])
             event2dimg[0, xbin, ybin] += npes[i][j]
             event2dimg[1, xbin, ybin] += hittime[i][j]
         pmtinfos.append(event2dimg)
