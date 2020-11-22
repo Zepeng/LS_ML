@@ -113,10 +113,10 @@ def test(testloader, epoch):
                     'acc': acc,
                     'epoch': epoch,
                     }
-            if not os.path.isdir('checkpoint_sens' ):
-                os.mkdir('checkpoint_sens' )
-            torch.save(state, './checkpoint_sens/ckpt_%d.t7' % epoch)
-            torch.save(state, './checkpoint_sens/ckpt.t7' )
+            if not os.path.isdir( name_dir_checkpoint ):
+                os.mkdir(name_dir_checkpoint )
+            torch.save(state, './'+name_dir_checkpoint+'/ckpt_%d.t7' % epoch)
+            torch.save(state, './'+name_dir_checkpoint+'/ckpt.t7' )
             best_acc = acc
         return test_loss/len(testloader), 100.*test_acc/total, score
 
@@ -125,14 +125,29 @@ if __name__ == "__main__":
     parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint', default=False)
     parser.add_argument('--filedir', '-i', type=str, help='directory of dataset files.')
+    parser.add_argument('--runlabel', '-l', type=str, help='Label to distinguish different gpu jobs')
     args = parser.parse_args()
-    #transformations = transforms.Compose([transforms.ToTensor()])
+
+    ####check input whether empty####
+    if args.filedir :
+        print( "FATAL!!!  -i RawFileDir is supposed to be not empty" )
+
+
+    ####define dirtionary variables####
+    name_dir_checkpoint = "checkpoint_sens_"+args.runlabel
+    name_dir_test_score = "test_score_"+args.runlabel
+
     # Data
     print('==> Preparing data..')
     list_of_datasets = []
     import glob
     filelist = glob.glob('%s/*.npz' % args.filedir)
-    batch_dataset = junodata.BatchDataset(filelist, 500)
+
+    file1 = np.load( filelist[0], allow_pickle=True )
+    total_evts = len(file1['pmtinfo'])
+    print("Number of Events in one file: ",total_evts)
+    exit()
+    batch_dataset = junodata.BatchDataset(filelist, total_evts )
 
     # Creating data indices for training and validation splits:
     dataset_size = len(batch_dataset)
@@ -154,7 +169,9 @@ if __name__ == "__main__":
     validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=4)
 
     # dataiter=iter(train_loader)
-    # print(next(dataiter))
+    # k = next(dataiter)
+    # print(len(k[0]))
+    # exit()
 
     lr = 1.0e-3
     momentum = 0.9
@@ -172,21 +189,23 @@ if __name__ == "__main__":
         net = torch.nn.DataParallel(net)
     # We use SGD
     optimizer = torch.optim.SGD(net.parameters(), lr, momentum=momentum, weight_decay=weight_decay)
+    # optimizer = torch.optim.Adam(net.parameters(), lr, weight_decay=weight_decay )
 
     net = net.to(device)
-    if args.resume and os.path.exists('./checkpoint_sens/ckpt.t7'):
+    if args.resume and os.path.exists('./'+name_dir_checkpoint+'/ckpt.t7'):
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
-        assert os.path.isdir('checkpoint_sens'), 'Error: no checkpoint directory found!'
+        assert os.path.isdir( name_dir_checkpoint ), 'Error: no checkpoint directory found!'
         if device == 'cuda':
-            checkpoint = torch.load('./checkpoint_sens/ckpt.t7' )
+            checkpoint = torch.load('./'+name_dir_checkpoint+'/ckpt.t7' )
         else:
-            checkpoint = torch.load('./checkpoint_sens/ckpt.t7', map_location=torch.device('cpu') )
+            checkpoint = torch.load('./'+name_dir_checkpoint+'/ckpt.t7', map_location=torch.device('cpu') )
         net.load_state_dict(checkpoint['net'])
         best_acc = checkpoint['acc']
         start_epoch = checkpoint['epoch'] + 1
     y_train_loss = np.zeros(100)
     y_train_acc = np.zeros(100)
+
 
     test_score = []
     start_time = time.time()
@@ -225,5 +244,7 @@ if __name__ == "__main__":
         epoch_elapse = time.time() - epoch_start
         print('Epoch %d used %f seconds' % (epoch, epoch_elapse))
         print(y_train_loss, y_train_acc)
-        np.save('test_score_%d.npy' % (start_epoch + 1), test_score)
+        if not os.path.isdir(name_dir_test_score):
+            os.mkdir(name_dir_test_score)
+        np.save('./'+name_dir_test_score+'/test_score_%d.npy' % (start_epoch + 1), test_score)
     print('Total time used is %f seconds' % (time.time() - start_time) )
