@@ -50,7 +50,7 @@ class PMTIDMap():
         (pmtid, x, y, z, theta, phi) = self.pmtmap[str(pmtid)]
         xbin = int(phi*128./360) #np.where(self.thetas == theta)[0]
         ybin = int(theta*128./180)
-        print(pmtid, x, y, z, theta, phi, xbin, ybin)
+        # print(pmtid, x, y, z, theta, phi, xbin, ybin)
         return(xbin, ybin)
 
 def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize = 100):
@@ -102,10 +102,14 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
     pmtmap.CalcDict()
 
     sigchain = ROOT.TChain('psdtree')
-    sigchain.Add('%s/*root' % sig_dir)
-    bkgchain = ROOT.TChain('psdtree')
-    bkgchain.Add('%s/*root' % bkg_dir)
+    # sigchain.Add('%s/*00001.root' % sig_dir)
+    sigchain.Add( sig_dir)
 
+    bkgchain = ROOT.TChain('psdtree')
+    # bkgchain.Add('%s/*00001.root' % bkg_dir)
+    bkgchain.Add( bkg_dir )
+
+    print("Load Raw Data Successfully!!")
     pmtinfos = []
     types = []
     eqen_batch = []
@@ -113,6 +117,8 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
     for batchentry in range(int(batchsize/2)):
         #save charge and hittime to 3D array
         i = int(batchsize/2)*batch_num + batchentry
+        if batchentry%10==0:
+            print("processing batchentry : ", batchentry)
         if i >= sigchain.GetEntries() or i >= bkgchain.GetEntries():
             continue
         sigchain.GetEntry(i)
@@ -121,14 +127,17 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
         npes = sigchain.Charge
         hittime = sigchain.Time
         eqen = sigchain.Eqen
+        # print("pmtids:   ", len(pmtids)) # 24154
+        # print("hittime:  ", len(hittime)) # 24154
+        # print("npes:   ", len(eqen)) # 1
         event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             event2dimg[0, xbin, ybin] += npes[j]
             if event2dimg[1, xbin, ybin] < 0.1:
-                event2dimg[1, xbin, ybin] = hittime[i][j]
+                event2dimg[1, xbin, ybin] = hittime[j]
             else:
-                event2dimg[1, xbin, ybin] = min(hittime[i][j], event2dimg[1, xbin, ybin])
+                event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
         pmtinfos.append(event2dimg)
         types.append(1)
         eqen_batch.append(eqen)
@@ -142,9 +151,9 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             event2dimg[0, xbin, ybin] += npes[j]
             if event2dimg[1, xbin, ybin] < 0.1:
-                event2dimg[1, xbin, ybin] = hittime[i][j]
+                event2dimg[1, xbin, ybin] = hittime[j]
             else:
-                event2dimg[1, xbin, ybin] = min(hittime[i][j], event2dimg[1, xbin, ybin])
+                event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
         pmtinfos.append(event2dimg)
         types.append(0)
         vertices.append([bkgchain.X, bkgchain.Y, bkgchain.Z])
@@ -166,6 +175,6 @@ if __name__ == '__main__':
     parser.add_argument('--outfile', '-o', type=str, help='Output root file.')
     parser.add_argument('--batch', '-n', type=int, help='Batch number.')
     args = parser.parse_args()
-    #chaintonpz(args.pmtmap, args.infile, args.outfile, args.eventtype)
+    # chaintonpz(args.pmtmap, args.infile, args.outfile, args.eventtype)
     chaintonpz(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, batch_num = args.batch)
     #'/cvmfs/juno.ihep.ac.cn/centos7_amd64_gcc830/Pre-Release/J20v1r0-Pre2/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
