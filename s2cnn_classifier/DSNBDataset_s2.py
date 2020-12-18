@@ -166,6 +166,77 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize
     else:
         np.savez(outfile , pmtinfo=np.array(pmtinfos)[indices], eventtype=np.array(types)[indices], eqen=np.array(eqen_batch)[indices], vertex=np.array(vertices)[indices])
 
+def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
+    # The csv file of PMT map must have the same tag as the MC production.
+    pmtmap = PMTIDMap(mapfile)
+    pmtmap.CalcDict()
+
+    sigchain = ROOT.TChain('psdtree')
+    # sigchain.Add('%s/*00001.root' % sig_dir)
+    sigchain.Add( sig_dir)
+
+    bkgchain = ROOT.TChain('psdtree')
+    # bkgchain.Add('%s/*00001.root' % bkg_dir)
+    bkgchain.Add( bkg_dir )
+
+    print("Load Raw Data Successfully!!")
+    pmtinfos = []
+    types = []
+    eqen_batch = []
+    vertices = []
+    batchsize=bkgchain.GetEntries()# because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
+    for batchentry in range(batchsize):
+        #save charge and hittime to 3D array
+        i_sig = start_entries + batchentry
+        if batchentry%10==0:
+            print("processing batchentry : ", batchentry)
+        if i_sig >= sigchain.GetEntries():
+            continue
+        sigchain.GetEntry(i_sig)
+        bkgchain.GetEntry(batchentry)
+        pmtids = sigchain.PMTID
+        npes = sigchain.Charge
+        hittime = sigchain.Time
+        eqen = sigchain.Eqen
+        # print("pmtids:   ", len(pmtids)) # 24154
+        # print("hittime:  ", len(hittime)) # 24154
+        # print("npes:   ", len(eqen)) # 1
+        event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
+        for j in range(len(pmtids)):
+            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
+            event2dimg[0, xbin, ybin] += npes[j]
+            if event2dimg[1, xbin, ybin] < 0.1:
+                event2dimg[1, xbin, ybin] = hittime[j]
+            else:
+                event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        pmtinfos.append(event2dimg)
+        types.append(1)
+        eqen_batch.append(eqen)
+        vertices.append([sigchain.X, sigchain.Y, sigchain.Z])
+        pmtids = bkgchain.PMTID
+        npes = bkgchain.Charge
+        hittime = bkgchain.Time
+        eqen = bkgchain.Eqen
+        event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
+        for j in range(len(pmtids)):
+            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
+            event2dimg[0, xbin, ybin] += npes[j]
+            if event2dimg[1, xbin, ybin] < 0.1:
+                event2dimg[1, xbin, ybin] = hittime[j]
+            else:
+                event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        pmtinfos.append(event2dimg)
+        types.append(0)
+        vertices.append([bkgchain.X, bkgchain.Y, bkgchain.Z])
+        eqen_batch.append(eqen)
+
+    indices = np.arange(len(pmtinfos))
+    np.random.shuffle(indices)
+    if outfile == '':
+        np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types))
+    else:
+        np.savez(outfile , pmtinfo=np.array(pmtinfos)[indices], eventtype=np.array(types)[indices], eqen=np.array(eqen_batch)[indices], vertex=np.array(vertices)[indices])
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
     parser.add_argument('--pmtmap', type=str, help='csc file of PMT map in JUNO.')
@@ -174,7 +245,9 @@ if __name__ == '__main__':
     parser.add_argument('--eventtype', '-t', type=str, help='Event type.')
     parser.add_argument('--outfile', '-o', type=str, help='Output root file.')
     parser.add_argument('--batch', '-n', type=int, help='Batch number.')
+    parser.add_argument('--StartEntries', '-e', type=int, help='Start Entry of sig_file.')
     args = parser.parse_args()
     # chaintonpz(args.pmtmap, args.infile, args.outfile, args.eventtype)
-    chaintonpz(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, batch_num = args.batch)
+    # chaintonpz(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, batch_num = args.batch)
+    Root2npz(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, args.StartEntries)
     #'/cvmfs/juno.ihep.ac.cn/centos7_amd64_gcc830/Pre-Release/J20v1r0-Pre2/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
