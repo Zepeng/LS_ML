@@ -3,6 +3,7 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/cnn_vertexrecon" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/s2cnn_classifier" isTestSource="false" />
     </content>
     <orderEntry type="jdk" jdkName="Remote Python 3.8.6 (sftp://luoxj@lxslc7:22/hpcfs/juno/junogpu/luoxj/anaconda3/envs/tf/bin/python) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
