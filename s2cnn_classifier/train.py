@@ -2,6 +2,7 @@ import torch
 import time
 import numpy as np
 import os
+import math
 
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.optim import lr_scheduler
@@ -19,7 +20,7 @@ best_acc = 0 # best test accuracy
 
 def adjust_learning_rate(optimizer, epoch, lr):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = lr
+    lr = lr * math.pow(2, -epoch)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     list_of_datasets = []
     import glob
     filelist = glob.glob('%s/*.npz' % args.filedir)
-    batch_dataset = junodata.BatchDataset(filelist, 500)
+    batch_dataset = junodata.BatchDataset(filelist, 330)
 
     # Creating data indices for training and validation splits:
     dataset_size = len(batch_dataset)
@@ -142,6 +143,7 @@ if __name__ == "__main__":
         net = torch.nn.DataParallel(net)
     # We use SGD
     optimizer = torch.optim.SGD(net.parameters(), lr, momentum=momentum, weight_decay=weight_decay)
+    # optimizer = torch.optim.Adam(net.parameters(), lr, weight_decay=weight_decay )
 
     net = net.to(device)
     if args.resume and os.path.exists('./checkpoint_sens/ckpt.t7'):

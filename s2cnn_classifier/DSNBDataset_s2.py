@@ -189,8 +189,6 @@ def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     bkgchain.Add(bkg_dir)
 
     print("Load Raw Data Successfully!!")
-    n_sig_cut = 0
-    n_bkg_cut = 0
     pmtinfos = []
     types = []
     eqen_batch = []
@@ -213,25 +211,22 @@ def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         y = sigchain.Y
         z = sigchain.Z
         # print(f"sig   E:{eqen},R:{x ** 2 + y ** 2 + z ** 2}")
-        # if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000: #16m*16m
-        if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
-            # print("pmtids:   ", len(pmtids)) # 24154
-            # print("hittime:  ", len(hittime)) # 24154
-            # print("npes:   ", len(eqen)) # 1
-            event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
-            for j in range(len(pmtids)):
-                (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
-                event2dimg[0, xbin, ybin] += npes[j]
-                if event2dimg[1, xbin, ybin] < 0.1:
-                    event2dimg[1, xbin, ybin] = hittime[j]
-                else:
-                    event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
-            pmtinfos.append(event2dimg)
-            types.append(1)
-            eqen_batch.append(eqen)
-            vertices.append([sigchain.X, sigchain.Y, sigchain.Z])
-        else:
-            n_sig_cut += 1;
+        # if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
+        # print("pmtids:   ", len(pmtids)) # 24154
+        # print("hittime:  ", len(hittime)) # 24154
+        # print("npes:   ", len(eqen)) # 1
+        event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
+        for j in range(len(pmtids)):
+            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
+            event2dimg[0, xbin, ybin] += npes[j]
+            if event2dimg[1, xbin, ybin] < 0.1:
+                event2dimg[1, xbin, ybin] = hittime[j]
+            else:
+                event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        pmtinfos.append(event2dimg)
+        types.append(1)
+        eqen_batch.append(eqen)
+        vertices.append([sigchain.X, sigchain.Y, sigchain.Z])
         pmtids = bkgchain.PMTID
         npes = bkgchain.Charge
         hittime = bkgchain.Time
@@ -240,23 +235,21 @@ def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         y = bkgchain.Y
         z = bkgchain.Z
         # print(f"bkg   E:{eqen},R:{x ** 2 + y ** 2 + z ** 2}")
-        if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
-            event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
-            for j in range(len(pmtids)):
-                (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
-                event2dimg[0, xbin, ybin] += npes[j]
-                if event2dimg[1, xbin, ybin] < 0.1:
-                    event2dimg[1, xbin, ybin] = hittime[j]
-                else:
-                    event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
-            pmtinfos.append(event2dimg)
-            types.append(0)
-            vertices.append([bkgchain.X, bkgchain.Y, bkgchain.Z])
-            eqen_batch.append(eqen)
-        else:
-            n_bkg_cut += 1
+        # if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
+        event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
+        for j in range(len(pmtids)):
+            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
+            event2dimg[0, xbin, ybin] += npes[j]
+            if event2dimg[1, xbin, ybin] < 0.1:
+                event2dimg[1, xbin, ybin] = hittime[j]
+            else:
+                event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        pmtinfos.append(event2dimg)
+        types.append(0)
+        vertices.append([bkgchain.X, bkgchain.Y, bkgchain.Z])
+        eqen_batch.append(eqen)
 
-    print(f"n_events in {outfile} : {len(pmtinfos)}, nsig_cut: {n_sig_cut}, n_bkg_cut: {n_bkg_cut}")
+    print(f"n_events in {outfile} : {len(pmtinfos)}")
     indices = np.arange(len(pmtinfos))
     np.random.shuffle(indices)
     if outfile == '':
