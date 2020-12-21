@@ -210,7 +210,7 @@ def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         x = sigchain.X
         y = sigchain.Y
         z = sigchain.Z
-        if eqen <= 31 or eqen >= 10 or x ** 2 + y ** 2 + z ** 2 <= 256: #16m*16m
+        if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256: #16m*16m
             # print("pmtids:   ", len(pmtids)) # 24154
             # print("hittime:  ", len(hittime)) # 24154
             # print("npes:   ", len(eqen)) # 1
@@ -233,7 +233,7 @@ def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         x = bkgchain.X
         y = bkgchain.Y
         z = bkgchain.Z
-        if eqen <= 31 or eqen >= 10 or x ** 2 + y ** 2 + z ** 2 <= 256:  # 16m*16m
+        if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256:  # 16m*16m
             event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
             for j in range(len(pmtids)):
                 (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
