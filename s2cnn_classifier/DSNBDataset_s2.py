@@ -57,6 +57,38 @@ class PMTIDMap():
         # print(pmtid, x, y, z, theta, phi, xbin, ybin)
         return (xbin, ybin)
 
+def save2root(outfile, pmtinfos, types, eqen_batch, vertices ):
+    n_evts = len(pmtinfos)
+    print(f"n_events in {outfile} : {n_evts}")
+    if outfile == '':
+        outfile = "data_fake.root"
+    f = ROOT.TFile(outfile, "recreate")
+    t = ROOT.TTree("data_tree", "data_tree")
+    pmtinfos2tree = np.array(pmtinfos[0], dtype=np.float64)
+    types2tree = np.array(types[0], dtype=np.int32)
+    eqen2tree = np.array(eqen_batch[0], dtype=np.float64)
+    vertices2tree = np.array(vertices[0], dtype=np.float64)
+    shape_pmtinfos2tree = pmtinfos2tree.shape
+    # t.Branch("pmtinfos", pmtinfos2tree, "pmtinfos["+str(shape_pmtinfos2tree[0])+"]["+str(shape_pmtinfos2tree[1])+"]["+str(shape_pmtinfos2tree[2])+"]/F")
+    t.Branch("eventtype", types2tree, "eventtype/I")
+    # t.Branch("eqen", eqen2tree, "eqen/F")
+    # t.Branch("vertex", vertices2tree, "vertex[3]/F")
+    for i_evt in range(n_evts):
+        pmtinfos2tree = np.array(pmtinfos[i_evt], dtype=np.float64)
+        types2tree = np.array(types[i_evt], dtype=np.int32)
+        eqen2tree = eqen_batch[i_evt]
+        vertices2tree = vertices[i_evt]
+        t.Fill()
+    f.Write()
+    f.Close()
+
+def save2npz(outfile, pmtinfos, types, eqen_batch, vertices ):
+    if outfile == '':
+        np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types))
+    else:
+        np.savez(outfile, pmtinfo=pmtinfos, eventtype=types,
+                 eqen=eqen_batch, vertex=vertices)
+
 
 def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize=100):
     # The csv file of PMT map must have the same tag as the MC production.
@@ -175,7 +207,7 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num=100, batchsize=5
                  eqen=np.array(eqen_batch)[indices], vertex=np.array(vertices)[indices])
 
 
-def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
+def GetS2cnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     # The csv file of PMT map must have the same tag as the MC production.
     pmtmap = PMTIDMap(mapfile)
     pmtmap.CalcDict()
@@ -193,7 +225,8 @@ def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     types = []
     eqen_batch = []
     vertices = []
-    batchsize = bkgchain.GetEntries()  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
+    # batchsize = bkgchain.GetEntries()  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
+    batchsize = 20# because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
     for batchentry in range(batchsize):
         # save charge and hittime to 3D array
         i_sig = start_entries + batchentry
@@ -237,6 +270,7 @@ def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         # print(f"bkg   E:{eqen},R:{x ** 2 + y ** 2 + z ** 2}")
         # if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
         event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
+
         for j in range(len(pmtids)):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             event2dimg[0, xbin, ybin] += npes[j]
@@ -249,15 +283,43 @@ def Root2npz(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         vertices.append([bkgchain.X, bkgchain.Y, bkgchain.Z])
         eqen_batch.append(eqen)
 
-    print(f"n_events in {outfile} : {len(pmtinfos)}")
     indices = np.arange(len(pmtinfos))
     np.random.shuffle(indices)
-    if outfile == '':
-        np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types))
-    else:
-        np.savez(outfile, pmtinfo=np.array(pmtinfos)[indices], eventtype=np.array(types)[indices],
-                 eqen=np.array(eqen_batch)[indices], vertex=np.array(vertices)[indices])
+    pmtinfos = np.array(pmtinfos)[indices]
+    types = np.array(types, dtype=np.int32)[indices]
+    eqen_batch = np.array(eqen_batch)[indices]
+    vertices = np.array(vertices)[indices]
 
+    save2npz(outfile, pmtinfos, types, eqen_batch, vertices)
+    # save2root(outfile, pmtinfos, types, eqen_batch, vertices)
+    # (pmtinfos_load , types_load, eqen_load, vertex_load) = LoadRoot(outfile)
+    # print("pmtinfos load:",pmtinfos_load)
+    # print("pmtinfos     :", pmtinfos)
+    # print("types_save: ",types)
+    # print("types_load: ",types_load)
+
+def LoadRoot(infile):
+    # t.Branch("pmtinfos", pmtinfos2tree, "pmtinfos["+str(shape_pmtinfos2tree[0])+"]["+str(shape_pmtinfos2tree[1])+"]["+str(shape_pmtinfos2tree[2])+"]/D")
+    # t.Branch("eventtype", types2tree, "eventtype/I")
+    # t.Branch("eqen", eqen2tree, "eqen/D")
+    # t.Branch("vertex", vertices2tree, "vertex[3]/D")
+    data_chain = ROOT.TChain("data_tree")
+    data_chain.Add(infile)
+    pmtinfos = []
+    eventtype = []
+    eqen_batch = []
+    vertices = []
+    for i in range(data_chain.GetEntries()):
+        data_chain.GetEntry(i)
+        # pmtinfos.append(np.reshape(data_chain.pmtinfos,(2,128,128)))
+        eventtype.append(data_chain.eventtype)
+        # eqen_batch.append(data_chain.eqen)
+        # vertices.append(data_chain.vertex)
+    pmtinfos = np.array(pmtinfos)
+    eventtype = np.array(eventtype)
+    eqen_batch = np.array(eqen_batch)
+    vertices = np.array(vertices)
+    return (pmtinfos, eventtype, eqen_batch, vertices)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
@@ -271,5 +333,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # chaintonpz(args.pmtmap, args.infile, args.outfile, args.eventtype)
     # chaintonpz(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, batch_num = args.batch)
-    Root2npz(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, args.StartEntries)
+    GetS2cnnData(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, args.StartEntries)
     # '/cvmfs/juno.ihep.ac.cn/centos7_amd64_gcc830/Pre-Release/J20v1r0-Pre2/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
