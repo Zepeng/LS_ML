@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import argparse
 import ROOT
 import math
+from scipy.interpolate import RegularGridInterpolator
+import pickle
 
 
 class PMTIDMap():
@@ -46,6 +48,19 @@ class PMTIDMap():
             thetaphi_dict[key] = np.sort(thetaphi_dict[key])
         self.thetaphi_dict = thetaphi_dict
         self.thetas = np.sort(thetas)
+    def CalcThetaPhiGrid(self):
+        thetas = set()
+        phis = set()
+        for key in self.pmtmap:
+            (pmtid, x, y, z, theta, phi) = self.pmtmap[key]
+            thetas.add(theta)
+            phis.add(phi)
+        thetas = np.array(list(thetas))
+        phis = np.array(list(phis))
+        self.thetas = np.sort(thetas)
+        self.phis = np.sort(phis)
+        print(f"len(thetas) : {len(self.thetas)}, len(phis) : {len(self.phis)}")
+
 
     def CalcBin(self, pmtid):
         if pmtid > self.maxpmtid:
@@ -56,6 +71,18 @@ class PMTIDMap():
         ybin = int(theta * 128. / 180)
         # print(pmtid, x, y, z, theta, phi, xbin, ybin)
         return (xbin, ybin)
+
+    def CalcBin_ThetaPhiImage(self, pmtid):
+        if pmtid > self.maxpmtid:
+            print('Wrong PMT ID')
+            return (0, 0)
+        (pmtid, x, y, z, theta, phi) = self.pmtmap[str(pmtid)]
+        # Using xbin and ybin, PMTs can be mapped into a image, which like a oval
+        xbin = np.where(self.thetas == theta)[0]
+        # xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)# When the theta is close to pi/2, we got the max length of phis
+        ybin = np.where(self.phis == phi)[0]
+        # print((xbin, ybin))
+        return(xbin, ybin)
 
 def save2root(outfile, pmtinfos, types, eqen_batch, vertices ):
     n_evts = len(pmtinfos)
@@ -88,7 +115,6 @@ def save2npz(outfile, pmtinfos, types, eqen_batch, vertices ):
     else:
         np.savez(outfile, pmtinfo=pmtinfos, eventtype=types,
                  eqen=eqen_batch, vertex=vertices)
-
 
 def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize=100):
     # The csv file of PMT map must have the same tag as the MC production.
@@ -133,7 +159,6 @@ def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize=100):
         else:
             np.savez(outfile + str(batch) + 'npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types),
                      eqen=np.array(eqen_batch))
-
 
 def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num=100, batchsize=500):
     # The csv file of PMT map must have the same tag as the MC production.
@@ -206,7 +231,6 @@ def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num=100, batchsize=5
         np.savez(outfile, pmtinfo=np.array(pmtinfos)[indices], eventtype=np.array(types)[indices],
                  eqen=np.array(eqen_batch)[indices], vertex=np.array(vertices)[indices])
 
-
 def GetS2cnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     # The csv file of PMT map must have the same tag as the MC production.
     pmtmap = PMTIDMap(mapfile)
@@ -226,14 +250,15 @@ def GetS2cnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     eqen_batch = []
     vertices = []
     # batchsize = bkgchain.GetEntries()  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
-    batchsize = 20# because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
+    batchsize = 270# because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
     for batchentry in range(batchsize):
         # save charge and hittime to 3D array
         i_sig = start_entries + batchentry
         if batchentry % 10 == 0:
             print("processing batchentry : ", batchentry)
-        if i_sig >= sigchain.GetEntries():
-            continue
+        if i_sig >= sigchain.GetEntries() or batchentry > bkgchain.GetEntries():
+            print("the batchsize is greater than bkgchain's  Entries , so we decided not to save the file")
+            exit(1)
         sigchain.GetEntry(i_sig)
         bkgchain.GetEntry(batchentry)
         pmtids = sigchain.PMTID
@@ -298,6 +323,134 @@ def GetS2cnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     # print("types_save: ",types)
     # print("types_load: ",types_load)
 
+def xyz2latlong(vertices):
+    x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
+    long = np.arctan2(y, x) # longitude as same as phi
+    xy2 = x**2 + y**2
+    lat = np.arctan2(z, np.sqrt(xy2))  # latitude as same as theta
+    return lat, long
+
+def interp_pmt2mesh(sig_r2, thetas, phis, V, method="linear", dtype=np.float32):
+    ele, azi = xyz2latlong(V)
+    s2 = np.array([ele, azi]).T
+    intp = RegularGridInterpolator((thetas, phis), sig_r2, method=method)
+    sig_s2 = intp(s2).astype(dtype)
+    # print("sig_s2 : ",sig_s2.shape) #sig_s2 :  (642,)
+    return sig_s2
+
+def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
+    # The csv file of PMT map must have the same tag as the MC production.
+    pmtmap = PMTIDMap(mapfile)
+    # pmtmap.CalcDict()
+    pmtmap.CalcThetaPhiGrid()
+
+    file_mesh = "/afs/ihep.ac.cn/users/l/luoxj/gpu_500G/ugscnn/mesh_files/icosphere_5.pkl"
+    p = pickle.load(open(file_mesh, "rb"))
+    V = p['V']
+
+    sigchain = ROOT.TChain('psdtree')
+    # sigchain.Add('%s/*00001.root' % sig_dir)
+    sigchain.Add(sig_dir)
+
+    bkgchain = ROOT.TChain('psdtree')
+    # bkgchain.Add('%s/*00001.root' % bkg_dir)
+    bkgchain.Add(bkg_dir)
+
+    print("Load Raw Data Successfully!!")
+    pmtinfos = []
+    types = []
+    eqen_batch = []
+    vertices = []
+    # batchsize = bkgchain.GetEntries()  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
+    batchsize = 270
+    for batchentry in range(batchsize):
+        # save charge and hittime to 3D array
+        i_sig = start_entries + batchentry
+        if batchentry % 10 == 0:
+            print("processing batchentry : ", batchentry)
+        if i_sig >= sigchain.GetEntries() or batchentry > bkgchain.GetEntries():
+            print("the batchsize is greater than bkgchain's  Entries , so we decided not to save the file")
+            exit(1)
+        sigchain.GetEntry(i_sig)
+        bkgchain.GetEntry(batchentry)
+        pmtids = sigchain.PMTID
+        npes = sigchain.Charge
+        hittime = sigchain.Time
+        eqen = sigchain.Eqen
+        x = sigchain.X
+        y = sigchain.Y
+        z = sigchain.Z
+
+        pmtids = np.array(pmtids)
+        print(f"pmtids.shape {len(pmtids)}")
+        # print(f"sig   E:{eqen},R:{x ** 2 + y ** 2 + z ** 2}")
+        # if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
+        # print("pmtids:   ", len(pmtids)) # 24154
+        # print("hittime:  ", len(hittime)) # 24154
+        # print("npes:   ", len(eqen)) # 1
+
+        pmtinfos = []
+        #save charge and hittime to 3D array
+        # event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
+        event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis) ), dtype=np.float16)
+        for j in range(len(pmtids)):
+            if pmtids[j]>17612:
+                continue
+            (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
+            # if ybin>124:
+            #     print(pmtids[i][j])
+            event2dimg[0, xbin, ybin] += npes[j]
+            if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
+                event2dimg[1, xbin, ybin] = hittime[j]
+            else:
+                event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        event2dimg[0] =interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V)
+        event2dimg[1] =interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V)
+        pmtinfos.append(event2dimg)
+
+        print("hitime:",hittime[:10])
+        print("npes: ", npes[:10])
+        print(len(pmtinfos[0][0][pmtinfos[0][0]>0]))
+        # plt.imshow(pmtinfos[0][0])
+        # plt.show()
+        # exit()
+
+        types.append(1)
+        eqen_batch.append(eqen)
+        vertices.append([sigchain.X, sigchain.Y, sigchain.Z])
+        pmtids = bkgchain.PMTID
+        npes = bkgchain.Charge
+        hittime = bkgchain.Time
+        eqen = bkgchain.Eqen
+        x = bkgchain.X
+        y = bkgchain.Y
+        z = bkgchain.Z
+        # print(f"bkg   E:{eqen},R:{x ** 2 + y ** 2 + z ** 2}")
+        # if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
+        event2dimg = np.zeros((2, 128, 128), dtype=np.float16)
+
+        for j in range(len(pmtids)):
+            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
+            event2dimg[0, xbin, ybin] += npes[j]
+            if event2dimg[1, xbin, ybin] < 0.1:
+                event2dimg[1, xbin, ybin] = hittime[j]
+            else:
+                event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        pmtinfos.append(event2dimg)
+        types.append(0)
+        vertices.append([bkgchain.X, bkgchain.Y, bkgchain.Z])
+        eqen_batch.append(eqen)
+
+    indices = np.arange(len(pmtinfos))
+    np.random.shuffle(indices)
+    pmtinfos = np.array(pmtinfos)[indices]
+    types = np.array(types, dtype=np.int32)[indices]
+    eqen_batch = np.array(eqen_batch)[indices]
+    vertices = np.array(vertices)[indices]
+
+    save2npz(outfile, pmtinfos, types, eqen_batch, vertices)
+
+
 def LoadRoot(infile):
     # t.Branch("pmtinfos", pmtinfos2tree, "pmtinfos["+str(shape_pmtinfos2tree[0])+"]["+str(shape_pmtinfos2tree[1])+"]["+str(shape_pmtinfos2tree[2])+"]/D")
     # t.Branch("eventtype", types2tree, "eventtype/I")
@@ -333,5 +486,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # chaintonpz(args.pmtmap, args.infile, args.outfile, args.eventtype)
     # chaintonpz(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, batch_num = args.batch)
-    GetS2cnnData(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, args.StartEntries)
+    # GetS2cnnData(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, args.StartEntries)
+    GetugscnnData(args.pmtmap, args.sigdir, args.bkgdir, args.outfile, args.StartEntries)
     # '/cvmfs/juno.ihep.ac.cn/centos7_amd64_gcc830/Pre-Release/J20v1r0-Pre2/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
