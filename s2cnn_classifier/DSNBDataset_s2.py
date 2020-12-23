@@ -57,10 +57,15 @@ class PMTIDMap():
             phis.add(phi)
         thetas = np.array(list(thetas))
         phis = np.array(list(phis))
-        self.thetas = np.sort(thetas)
-        self.phis = np.sort(phis)
+        self.thetas = np.sort(thetas) / 180. * math.pi
+        self.phis = np.sort(phis) / 180. * math.pi
         print(f"len(thetas) : {len(self.thetas)}, len(phis) : {len(self.phis)}")
-
+        print(f"thetas -- max: {np.max(self.thetas)}, min: {np.min(self.thetas)}")
+        print(f"phis   -- max: {np.max(self.phis)}, min: {np.min(self.phis)}")
+        print(self.thetas)
+    def CalcThetaPhiSquareGrid(self, n_grid:int):
+        self.thetas = np.linspace(-np.pi*0.5, np.pi*0.5, n_grid)
+        self.phis = np.linspace(-np.pi, np.pi, n_grid)
 
     def CalcBin(self, pmtid):
         if pmtid > self.maxpmtid:
@@ -330,9 +335,17 @@ def xyz2latlong(vertices):
     lat = np.arctan2(z, np.sqrt(xy2))  # latitude as same as theta
     return lat, long
 
-def interp_pmt2mesh(sig_r2, thetas, phis, V, method="linear", dtype=np.float32):
+def interp_pmt2mesh(sig_r2, thetas, phis, V, method="nearest", dtype=np.float32):
     ele, azi = xyz2latlong(V)
+    print(f"ele range: {np.min(ele)}--{np.max(ele)}")
+    print(f"azi range: {np.min(azi)}--{np.max(azi)}")
+    print(f"thetas -- max: {np.max(thetas)}, min: {np.min(thetas)}")
+    print(f"phis   -- max: {np.max(phis)}, min: {np.min(phis)}")
     s2 = np.array([ele, azi]).T
+    print("s2:   ",s2.shape)
+    print("sig_r2:   ", sig_r2.shape)
+    print("(theta, phis):  ", (thetas[:10], phis[:10]))
+    # sig_r2 = np.concatenate((sig_r2, sig_r2[:, 0:1]), axis=1) #aims to add sig_r2 images one column
     intp = RegularGridInterpolator((thetas, phis), sig_r2, method=method)
     sig_s2 = intp(s2).astype(dtype)
     # print("sig_s2 : ",sig_s2.shape) #sig_s2 :  (642,)
@@ -342,7 +355,8 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     # The csv file of PMT map must have the same tag as the MC production.
     pmtmap = PMTIDMap(mapfile)
     # pmtmap.CalcDict()
-    pmtmap.CalcThetaPhiGrid()
+    n_grid = 128
+    pmtmap.CalcThetaPhiSquareGrid(128)
 
     file_mesh = "/afs/ihep.ac.cn/users/l/luoxj/gpu_500G/ugscnn/mesh_files/icosphere_5.pkl"
     p = pickle.load(open(file_mesh, "rb"))
@@ -382,7 +396,7 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         z = sigchain.Z
 
         pmtids = np.array(pmtids)
-        print(f"pmtids.shape {len(pmtids)}")
+        # print(f"pmtids.shape {len(pmtids)}")
         # print(f"sig   E:{eqen},R:{x ** 2 + y ** 2 + z ** 2}")
         # if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
         # print("pmtids:   ", len(pmtids)) # 24154
@@ -392,11 +406,14 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         pmtinfos = []
         #save charge and hittime to 3D array
         # event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
-        event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis) ), dtype=np.float16)
+        # event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis) ), dtype=np.float16)
+        event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
+        event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
         for j in range(len(pmtids)):
             if pmtids[j]>17612:
                 continue
-            (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
+            # (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
+            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             # if ybin>124:
             #     print(pmtids[i][j])
             event2dimg[0, xbin, ybin] += npes[j]
@@ -404,9 +421,9 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
                 event2dimg[1, xbin, ybin] = hittime[j]
             else:
                 event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
-        event2dimg[0] =interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V)
-        event2dimg[1] =interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V)
-        pmtinfos.append(event2dimg)
+        event2dimg_interp[0] =interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V)
+        event2dimg_interp[1] =interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V)
+        pmtinfos.append(event2dimg_interp)
 
         print("hitime:",hittime[:10])
         print("npes: ", npes[:10])
