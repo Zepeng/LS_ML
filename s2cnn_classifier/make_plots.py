@@ -21,4 +21,3 @@ plt.xlim(0.0,1)
 plt.xlabel('DNN output')
 plt.yscale('log')
 plt.savefig('DSNB_classification.pdf')
-
