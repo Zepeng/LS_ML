@@ -2,6 +2,7 @@ import uproot as up
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import argparse
 import ROOT
 import math
@@ -57,12 +58,11 @@ class PMTIDMap():
             phis.add(phi)
         thetas = np.array(list(thetas))
         phis = np.array(list(phis))
-        self.thetas = np.sort(thetas) / 180. * math.pi
-        self.phis = np.sort(phis) / 180. * math.pi
+        self.thetas = np.sort(thetas)
+        self.phis = np.sort(phis)
         print(f"len(thetas) : {len(self.thetas)}, len(phis) : {len(self.phis)}")
         print(f"thetas -- max: {np.max(self.thetas)}, min: {np.min(self.thetas)}")
         print(f"phis   -- max: {np.max(self.phis)}, min: {np.min(self.phis)}")
-        print(self.thetas)
     def CalcThetaPhiSquareGrid(self, n_grid:int):
         self.thetas = np.linspace(-np.pi*0.5, np.pi*0.5, n_grid)
         self.phis = np.linspace(-np.pi, np.pi, n_grid)
@@ -328,6 +328,25 @@ def GetS2cnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     # print("types_save: ",types)
     # print("types_load: ",types_load)
 
+def PlotRawSignal(event2dimage, x, y, z ):
+    fig_hittime = plt.figure("hittime")
+    ax = fig_hittime.add_subplot(111, projection='3d' )
+    indices = (event2dimage[1] != 0.)
+    # print(indices)
+    img_hittime = ax.scatter(x[indices], y[indices], z[indices], c=event2dimage[1][indices], cmap=plt.hot(), s=1)
+    # img_hittime = ax.scatter(x, y, z, c=event2dimage[1], cmap=plt.hot(), s=1)
+    fig_hittime.colorbar(img_hittime)
+
+    fig_eqen = plt.figure("eqen")
+    ax = fig_eqen.add_subplot(111, projection='3d' )
+    indices = (event2dimage[0] != 0)
+    img_eqen = ax.scatter(x[indices], y[indices], z[indices], c=event2dimage[0][indices], cmap=plt.hot(), s=1)
+    # img_eqen = ax.scatter(x, y, z, c=event2dimage[0], cmap=plt.hot(), s=1)
+    fig_eqen.colorbar(img_eqen)
+    plt.show()
+    exit()
+
+
 def xyz2latlong(vertices):
     x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
     long = np.arctan2(y, x) # longitude as same as phi
@@ -353,10 +372,22 @@ def interp_pmt2mesh(sig_r2, thetas, phis, V, method="nearest", dtype=np.float32)
 
 def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     # The csv file of PMT map must have the same tag as the MC production.
+    plot_result:bool = True
+    max_n_points_grid:bool = True
     pmtmap = PMTIDMap(mapfile)
     # pmtmap.CalcDict()
     n_grid = 128
-    pmtmap.CalcThetaPhiSquareGrid(128)
+    if max_n_points_grid:
+        pmtmap.CalcThetaPhiGrid()
+    else:
+        pmtmap.CalcThetaPhiSquareGrid(n_grid)
+    if plot_result:
+        PHIS, THETAS = np.meshgrid( pmtmap.phis, pmtmap.thetas) #Attention !!! Here we must be aware of the order of two inputs!!
+        # print(f"thetas:{pmtmap.thetas}")
+        # print(f"grid(thetas): {THETAS}")
+        x_raw_grid = np.cos(THETAS) * np.cos(PHIS)
+        y_raw_grid = np.cos(THETAS) * np.sin(PHIS)
+        z_raw_grid = np.sin(THETAS)
 
     file_mesh = "/afs/ihep.ac.cn/users/l/luoxj/gpu_500G/ugscnn/mesh_files/icosphere_5.pkl"
     p = pickle.load(open(file_mesh, "rb"))
@@ -406,21 +437,26 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         pmtinfos = []
         #save charge and hittime to 3D array
         # event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
-        # event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis) ), dtype=np.float16)
-        event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
+        event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis) ), dtype=np.float16)
+        # event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
         event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
         for j in range(len(pmtids)):
             if pmtids[j]>17612:
                 continue
-            # (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
-            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
+            if max_n_points_grid:
+                (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
+            else:
+                (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
             # if ybin>124:
             #     print(pmtids[i][j])
             event2dimg[0, xbin, ybin] += npes[j]
-            if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
+            # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
+            if event2dimg[1, xbin, ybin] == 0:
                 event2dimg[1, xbin, ybin] = hittime[j]
             else:
                 event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        if plot_result:
+            PlotRawSignal(event2dimg, x_raw_grid, y_raw_grid, z_raw_grid)
         event2dimg_interp[0] =interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V)
         event2dimg_interp[1] =interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V)
         pmtinfos.append(event2dimg_interp)
