@@ -20,11 +20,7 @@ class Model(nn.Module):
         grid = s2_equatorial_grid(max_beta=0, n_alpha=2 * self.bandwidths[0], n_beta=1)
         sequence.append(S2Convolution(self.features[0], self.features[1], self.bandwidths[0], self.bandwidths[1], grid))
 
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/master
-        # SO3 layers
+        # SO4 layers
         for l in range(1, len(self.features) - 2):
             nfeature_in = self.features[l]
             nfeature_out = self.features[l + 1]

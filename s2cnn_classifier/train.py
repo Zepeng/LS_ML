@@ -6,9 +6,10 @@ import os
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.optim import lr_scheduler
 from torch import nn
+import torch.nn.functional as F
 
 import argparse
-import junodata, model, model_identity, s2net
+import junodata, model, model_identity, s2net, model_meshcnn1, model_meshcnn2
 
 device = 'cuda'
 if torch.cuda.is_available():
@@ -19,7 +20,7 @@ best_acc = 0 # best test accuracy
 
 def adjust_learning_rate(optimizer, epoch, lr):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = lr
+    lr = lr*2**(-epoch)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -42,14 +43,19 @@ def train(trainloader, epoch):
         optimizer.zero_grad()
         outputs = net(inputs)
         outputs = fsoftmax(outputs)
+        # loss = F.nll_loss(outputs, targets.long())
+        # pred = outputs.max(1, keepdim=True)[1] # get the index of the max log-probability
         loss = criterion(outputs, targets.long())
         loss.backward()
         optimizer.step()
+        if args.decay:
+            scheduler.step()
         train_loss += loss.item()
         _, predicted = outputs.max(1)
         correct += predicted.eq(targets).sum().item()
         total += targets.size(0)
-        print(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
+        if batch_idx % 10 == 0:
+            print(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                 % (train_loss/(batch_idx+1), 100.*correct/total, correct, total), end='\r')
     return train_loss/len(trainloader), 100.*correct/total
 
@@ -69,6 +75,7 @@ def test(testloader, epoch):
             outputs = net(inputs)
             outputs = fsoftmax(outputs)
             loss = criterion(outputs, targets.long())
+            # loss = F.nll_loss(outputs, targets.long())
             _, predicted = outputs.max(1)
             correct += predicted.eq(targets).sum().item()
             test_loss += loss.item()
@@ -98,6 +105,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument('--filedir', '-i', type=str, help='directory of dataset files.')
+    parser.add_argument('--decay', '-d', action='store_true', help='whether using decay lr')
     args = parser.parse_args()
     #transformations = transforms.Compose([transforms.ToTensor()])
     # Data
@@ -132,9 +140,12 @@ if __name__ == "__main__":
     start_epoch = 0
 
     print('==> Building model..')
-    net = model.Model(2)
+    # net = model.Model(2)
+    net = model_meshcnn1.Model(mesh_folder="./mesh_files/", nclasses=2)
+    # net = model_meshcnn2.Model(mesh_folder="./mesh_files/", nclasses=2)
     # define loss function (criterion) and optimizer
     criterion = torch.nn.CrossEntropyLoss().cuda()
+    # criterion = F.nll_loss().cuda()
     #use DataParallel if multiple GPUs are available
     # Do not use this until the dataloader is updated, current dataloader blows up the memory.
     if torch.cuda.device_count() > 1:
@@ -142,6 +153,10 @@ if __name__ == "__main__":
         net = torch.nn.DataParallel(net)
     # We use SGD
     optimizer = torch.optim.SGD(net.parameters(), lr, momentum=momentum, weight_decay=weight_decay)
+    # optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
+    if args.decay:
+        print("Let's use decay learning rate!")
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
     net = net.to(device)
     if args.resume and os.path.exists('./checkpoint_sens/ckpt.t7'):

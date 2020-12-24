@@ -3,7 +3,7 @@ import pickle
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
-filename = "0.root.npz"
+filename = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/jobs_DSNB/data/10.npz"
 file_mesh = "/afs/ihep.ac.cn/users/l/luoxj/gpu_500G/ugscnn/mesh_files/icosphere_5.pkl"
 batch = np.load(filename)
 pmtinfos = batch['pmtinfo']  # [idx % self.nevt_file]

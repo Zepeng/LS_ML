@@ -473,7 +473,7 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     max_n_points_grid: bool = True
     do_calcgrid: bool = False
     pmtmap = PMTIDMap(mapfile)
-    file_mesh = "/afs/ihep.ac.cn/users/l/luoxj/gpu_500G/ugscnn/mesh_files/icosphere_5.pkl"
+    file_mesh = "./mesh_files/icosphere_5.pkl"
     p = pickle.load(open(file_mesh, "rb"))
     V = p['V']
     # pmtmap.CalcDict()
@@ -515,16 +515,15 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     types = []
     eqen_batch = []
     vertices = []
-    # batchsize = bkgchain.GetEntries()  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
-    batchsize = 270
+    batchsize = bkgchain.GetEntries()  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
+    # batchsize = 270
     for batchentry in range(batchsize):
         # save charge and hittime to 3D array
         i_sig = start_entries + batchentry
         if batchentry % 10 == 0:
             print("processing batchentry : ", batchentry)
         if i_sig >= sigchain.GetEntries() or batchentry > bkgchain.GetEntries():
-            print("the batchsize is greater than bkgchain's  Entries , so we decided not to save the file")
-            exit(1)
+            continue
         sigchain.GetEntry(i_sig)
         bkgchain.GetEntry(batchentry)
         pmtids = sigchain.PMTID
