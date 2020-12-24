@@ -461,7 +461,7 @@ def interp_pmt2mesh(sig_r2, thetas, phis, V, pmtmap, method="linear", do_calcgri
         sig_s2 = intp(s2).astype(dtype)
     else:
         indices = (sig_r2 != 0.)
-        sig_s2 = griddata((thetas[indices], phis[indices]), sig_r2[indices], (ele, azi), method=method)
+        sig_s2 = griddata((thetas[indices], phis[indices]), sig_r2[indices], (ele, azi), method=method, fill_value=0.)
     # print("sig_s2 : ", sig_s2, "shape: ", sig_s2.shape)  # sig_s2 :  (642,)
     return sig_s2
 
@@ -469,7 +469,7 @@ def interp_pmt2mesh(sig_r2, thetas, phis, V, pmtmap, method="linear", do_calcgri
 def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     # The csv file of PMT map must have the same tag as the MC production.
     plot_result_sig: bool = False
-    plot_result_bkg: bool = True
+    plot_result_bkg: bool = False
     max_n_points_grid: bool = True
     do_calcgrid: bool = False
     pmtmap = PMTIDMap(mapfile)
@@ -581,7 +581,7 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
                     event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
 
         event2dimg_interp[0] = interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
-        event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="nearest")
+        event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
         if plot_result_sig:
             PlotRawSignal(event2dimg, x_raw_grid, y_raw_grid, z_raw_grid)
             PlotIntepSignal(event2dimg_interp, x_V, y_V, z_V)
