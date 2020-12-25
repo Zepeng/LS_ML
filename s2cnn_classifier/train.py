@@ -39,6 +39,8 @@ def train(trainloader, epoch):
     fsoftmax = nn.Softmax(dim=1)
     for batch_idx, (inputs, targets, spectators) in enumerate(trainloader):
         inputs, targets = flatten_batch(inputs), flatten_batch(targets)
+        if len(inputs) == 0:
+            continue
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
@@ -70,6 +72,8 @@ def test(testloader, epoch):
     with torch.no_grad():
         for batch_idx, (inputs, targets, spectators) in enumerate(testloader):
             inputs, targets = flatten_batch(inputs), flatten_batch(targets)
+            if len(inputs) == 0:
+                continue
             spectators = flatten_batch(spectators)
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
@@ -141,7 +145,7 @@ if __name__ == "__main__":
 
     print('==> Building model..')
     # net = model.Model(2)
-    net = model_meshcnn1.Model(mesh_folder="./mesh_files/", nclasses=2)
+    net = model_meshcnn1.Model(mesh_folder="/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/mesh_files/", nclasses=2)
     # net = model_meshcnn2.Model(mesh_folder="./mesh_files/", nclasses=2)
     # define loss function (criterion) and optimizer
     criterion = torch.nn.CrossEntropyLoss().cuda()
@@ -191,7 +195,7 @@ if __name__ == "__main__":
                 print(e.message)
                 print(e.__class__.__name__)
                 traceback.print_exc(e)
-                break
+                continue
             print("Epoch [%d] train aveloss=%.3f aveacc=%.3f"%(epoch,train_ave_loss,train_ave_acc))
             y_train_loss[epoch] = train_ave_loss
             y_train_acc[epoch]  = train_ave_acc
