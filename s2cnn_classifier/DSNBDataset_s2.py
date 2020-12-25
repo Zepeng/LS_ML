@@ -516,6 +516,8 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     eqen_batch = []
     vertices = []
     batchsize = bkgchain.GetEntries()  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
+    # batchsize = 20  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
+    print("batchsize:  ",bkgchain.GetEntries())
     # batchsize = 270
     for batchentry in range(batchsize):
         # save charge and hittime to 3D array
@@ -523,6 +525,7 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         if batchentry % 10 == 0:
             print("processing batchentry : ", batchentry)
         if i_sig >= sigchain.GetEntries() or batchentry > bkgchain.GetEntries():
+            print("continued i_sig: ",i_sig)
             continue
         sigchain.GetEntry(i_sig)
         bkgchain.GetEntry(batchentry)
@@ -542,7 +545,6 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         # print("hittime:  ", len(hittime)) # 24154
         # print("npes:   ", len(eqen)) # 1
 
-        pmtinfos = []
         # save charge and hittime to 3D array
         # event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
         if do_calcgrid == False:
@@ -644,6 +646,7 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         types.append(0)
         vertices.append([bkgchain.X, bkgchain.Y, bkgchain.Z])
         eqen_batch.append(eqen)
+        # print("len(pmtinfos):  ",len(pmtinfos))
 
     indices = np.arange(len(pmtinfos))
     np.random.shuffle(indices)
