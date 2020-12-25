@@ -55,9 +55,9 @@ class BatchDataset(data.Dataset):
     def __getitem__(self, idx):
         filename = self.filelist[idx]
         batch = np.load(filename)
-        pmtinfos = batch['pmtinfo'][:270] #[idx % self.nevt_file]
-        types = batch['eventtype'][:270] #[idx % self.nevt_file]
-        eqens    = batch['eqen'][:270]
+        pmtinfos = batch['pmtinfo'][:200] #[idx % self.nevt_file]
+        types = batch['eventtype'][:200] #[idx % self.nevt_file]
+        eqens    = batch['eqen'][:200]
         # pmtinfos = batch['pmtinfo'] #[idx % self.nevt_file]
         # types = batch['eventtype'] #[idx % self.nevt_file]
         # eqens    = batch['eqen']

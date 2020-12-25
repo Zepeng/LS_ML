@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-results = np.load('test_score_1.npy', allow_pickle=True)[3]
+results = np.load('./usgcnn_300/test_score_1.npy', allow_pickle=True)[3]
 signal = []
 background = []
 for result in results:
@@ -21,3 +21,24 @@ plt.xlim(0.0,1)
 plt.xlabel('DNN output')
 plt.yscale('log')
 plt.savefig('DSNB_classification.pdf')
+
+result_loss = np.load('./usgcnn_300/loss_acc.npy', allow_pickle=True)
+result_loss = result_loss[:, :20]
+print(result_loss)
+train_loss, train_acc, test_loss, test_acc = (result_loss[0], result_loss[1], result_loss[2], result_loss[3])
+
+plt.figure("Accuracy")
+plt.plot(train_acc, label= "Train")
+plt.plot(test_acc  , label= "Test")
+plt.legend()
+plt.xlabel("epoch")
+plt.title("Accuracy")
+
+plt.figure("Loss")
+plt.plot(train_loss, label= "Train")
+plt.plot(test_loss  , label= "Test")
+plt.legend()
+plt.xlabel("epoch")
+plt.title("Loss")
+
+plt.show()
