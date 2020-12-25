@@ -9,6 +9,7 @@ import math
 from scipy.interpolate import RegularGridInterpolator
 import pickle
 from scipy.interpolate import griddata
+import os
 
 
 class PMTIDMap():
@@ -150,6 +151,8 @@ def save2npz(outfile, pmtinfos, types, eqen_batch, vertices):
     else:
         np.savez(outfile, pmtinfo=pmtinfos, eventtype=types,
                  eqen=eqen_batch, vertex=vertices)
+    print("Save npz files Successfully!!")
+
 
 
 def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize=100):
@@ -465,6 +468,47 @@ def interp_pmt2mesh(sig_r2, thetas, phis, V, pmtmap, method="linear", do_calcgri
     # print("sig_s2 : ", sig_s2, "shape: ", sig_s2.shape)  # sig_s2 :  (642,)
     return sig_s2
 
+def GetOneEventImage(pmtids:np.ndarray, hittime:np.ndarray, npes:np.ndarray, pmtmap:PMTIDMap, V,
+                     do_calcgrid:str=False, max_n_points_grid:str=True):
+    if do_calcgrid == False:
+        event2dimg = np.zeros((2, len(pmtmap.thetas)), dtype=np.float16)
+    else:
+        event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis)), dtype=np.float16)
+
+    # event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
+    event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
+    for j in range(len(pmtids)):
+        if pmtids[j] > 17612:
+            continue
+        if max_n_points_grid:
+            if do_calcgrid:
+                (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
+            else:
+                i_pmt = pmtids[j]
+        else:
+            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
+        # if ybin>124:
+        #     print(pmtids[i][j])
+        if do_calcgrid == False:
+            event2dimg[0, i_pmt] += npes[j]
+            # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
+            if event2dimg[1, i_pmt] == 0:
+                event2dimg[1, i_pmt] = hittime[j]
+            else:
+                event2dimg[1, i_pmt] = min(hittime[j], event2dimg[1, i_pmt])
+        else:
+            event2dimg[0, xbin, ybin] += npes[j]
+            # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
+            if event2dimg[1, xbin, ybin] == 0:
+                event2dimg[1, xbin, ybin] = hittime[j]
+            else:
+                event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+
+    event2dimg_interp[0] = interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
+    event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
+
+    return (event2dimg, event2dimg_interp)
+
 
 def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     # The csv file of PMT map must have the same tag as the MC production.
@@ -533,11 +577,7 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         npes = sigchain.Charge
         hittime = sigchain.Time
         eqen = sigchain.Eqen
-        x = sigchain.X
-        y = sigchain.Y
-        z = sigchain.Z
-
-        pmtids = np.array(pmtids)
+        # pmtids = np.array(pmtids)
         # print(f"pmtids.shape {len(pmtids)}")
         # print(f"sig   E:{eqen},R:{x ** 2 + y ** 2 + z ** 2}")
         # if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
@@ -547,42 +587,46 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
 
         # save charge and hittime to 3D array
         # event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
-        if do_calcgrid == False:
-            event2dimg = np.zeros((2, len(pmtmap.thetas)), dtype=np.float16)
-        else:
-            event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis)), dtype=np.float16)
 
-        # event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
-        event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
-        for j in range(len(pmtids)):
-            if pmtids[j] > 17612:
-                continue
-            if max_n_points_grid:
-                if do_calcgrid:
-                    (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
-                else:
-                    i_pmt = pmtids[j]
-            else:
-                (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
-            # if ybin>124:
-            #     print(pmtids[i][j])
-            if do_calcgrid == False:
-                event2dimg[0, i_pmt] += npes[j]
-                # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
-                if event2dimg[1, i_pmt] == 0:
-                    event2dimg[1, i_pmt] = hittime[j]
-                else:
-                    event2dimg[1, i_pmt] = min(hittime[j], event2dimg[1, i_pmt])
-            else:
-                event2dimg[0, xbin, ybin] += npes[j]
-                # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
-                if event2dimg[1, xbin, ybin] == 0:
-                    event2dimg[1, xbin, ybin] = hittime[j]
-                else:
-                    event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        ###################################################
+        # if do_calcgrid == False:
+        #     event2dimg = np.zeros((2, len(pmtmap.thetas)), dtype=np.float16)
+        # else:
+        #     event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis)), dtype=np.float16)
+        #
+        # # event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
+        # event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
+        # for j in range(len(pmtids)):
+        #     if pmtids[j] > 17612:
+        #         continue
+        #     if max_n_points_grid:
+        #         if do_calcgrid:
+        #             (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
+        #         else:
+        #             i_pmt = pmtids[j]
+        #     else:
+        #         (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
+        #     # if ybin>124:
+        #     #     print(pmtids[i][j])
+        #     if do_calcgrid == False:
+        #         event2dimg[0, i_pmt] += npes[j]
+        #         # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
+        #         if event2dimg[1, i_pmt] == 0:
+        #             event2dimg[1, i_pmt] = hittime[j]
+        #         else:
+        #             event2dimg[1, i_pmt] = min(hittime[j], event2dimg[1, i_pmt])
+        #     else:
+        #         event2dimg[0, xbin, ybin] += npes[j]
+        #         # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
+        #         if event2dimg[1, xbin, ybin] == 0:
+        #             event2dimg[1, xbin, ybin] = hittime[j]
+        #         else:
+        #             event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        #
+        # event2dimg_interp[0] = interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
+        # event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
 
-        event2dimg_interp[0] = interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
-        event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
+        (event2dimg, event2dimg_interp) = GetOneEventImage(pmtids, hittime, npes, pmtmap, V, do_calcgrid, max_n_points_grid)
         if plot_result_sig:
             PlotRawSignal(event2dimg, x_raw_grid, y_raw_grid, z_raw_grid)
             PlotIntepSignal(event2dimg_interp, x_V, y_V, z_V)
@@ -597,46 +641,44 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         npes = bkgchain.Charge
         hittime = bkgchain.Time
         eqen = bkgchain.Eqen
-        x = bkgchain.X
-        y = bkgchain.Y
-        z = bkgchain.Z
 
-        if do_calcgrid == False:
-            event2dimg = np.zeros((2, len(pmtmap.thetas)), dtype=np.float16)
-        else:
-            event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis)), dtype=np.float16)
-
-        # event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
-        event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
-        for j in range(len(pmtids)):
-            if pmtids[j] > 17612:
-                continue
-            if max_n_points_grid:
-                if do_calcgrid:
-                    (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
-                else:
-                    i_pmt = pmtids[j]
-            else:
-                (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
-            # if ybin>124:
-            #     print(pmtids[i][j])
-            if do_calcgrid == False:
-                event2dimg[0, i_pmt] += npes[j]
-                # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
-                if event2dimg[1, i_pmt] == 0:
-                    event2dimg[1, i_pmt] = hittime[j]
-                else:
-                    event2dimg[1, i_pmt] = min(hittime[j], event2dimg[1, i_pmt])
-            else:
-                event2dimg[0, xbin, ybin] += npes[j]
-                # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
-                if event2dimg[1, xbin, ybin] == 0:
-                    event2dimg[1, xbin, ybin] = hittime[j]
-                else:
-                    event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
-
-        event2dimg_interp[0] = interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
-        event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="nearest")
+        # if do_calcgrid == False:
+        #     event2dimg = np.zeros((2, len(pmtmap.thetas)), dtype=np.float16)
+        # else:
+        #     event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis)), dtype=np.float16)
+        #
+        # # event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
+        # event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
+        # for j in range(len(pmtids)):
+        #     if pmtids[j] > 17612:
+        #         continue
+        #     if max_n_points_grid:
+        #         if do_calcgrid:
+        #             (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
+        #         else:
+        #             i_pmt = pmtids[j]
+        #     else:
+        #         (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
+        #     # if ybin>124:
+        #     #     print(pmtids[i][j])
+        #     if do_calcgrid == False:
+        #         event2dimg[0, i_pmt] += npes[j]
+        #         # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
+        #         if event2dimg[1, i_pmt] == 0:
+        #             event2dimg[1, i_pmt] = hittime[j]
+        #         else:
+        #             event2dimg[1, i_pmt] = min(hittime[j], event2dimg[1, i_pmt])
+        #     else:
+        #         event2dimg[0, xbin, ybin] += npes[j]
+        #         # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
+        #         if event2dimg[1, xbin, ybin] == 0:
+        #             event2dimg[1, xbin, ybin] = hittime[j]
+        #         else:
+        #             event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
+        #
+        # event2dimg_interp[0] = interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
+        # event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="nearest")
+        (event2dimg, event2dimg_interp) = GetOneEventImage(pmtids, hittime, npes, pmtmap, V, do_calcgrid, max_n_points_grid)
         if plot_result_bkg:
             PlotRawSignal(event2dimg, x_raw_grid, y_raw_grid, z_raw_grid)
             PlotIntepSignal(event2dimg_interp, x_V, y_V, z_V)
@@ -656,6 +698,10 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     vertices = np.array(vertices)[indices]
 
     save2npz(outfile, pmtinfos, types, eqen_batch, vertices)
+    if len(pmtinfos) == 0:
+        os.system("echo \"Find A problem file!!!!\">> ./file_error.txt")
+        os.system(f"echo {sig_dir} >> ./file_error.txt")
+        os.system(f"echo {bkg_dir} >> ./file_error.txt")
 
 
 def LoadRoot(infile):
