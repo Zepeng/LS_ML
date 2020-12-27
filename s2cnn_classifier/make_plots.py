@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-results = np.load('./usgcnn_300/test_score_1.npy', allow_pickle=True)[3]
+result_dir = "./usgcnn_train_TimeNearest/"
+result_dir = "./usgcnn_train_TimeNearest_lr0.5decay/"
+results = np.load(result_dir+'test_score_1.npy', allow_pickle=True)[3]
 signal = []
 background = []
 for result in results:
@@ -22,7 +24,7 @@ plt.xlabel('DNN output')
 plt.yscale('log')
 plt.savefig('DSNB_classification.pdf')
 
-result_loss = np.load('./usgcnn_300/loss_acc.npy', allow_pickle=True)
+result_loss = np.load(result_dir+'loss_acc.npy', allow_pickle=True)
 result_loss = result_loss[:, :20]
 print(result_loss)
 train_loss, train_acc, test_loss, test_acc = (result_loss[0], result_loss[1], result_loss[2], result_loss[3])

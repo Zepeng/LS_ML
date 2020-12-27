@@ -6,13 +6,15 @@ import numpy as np
 import math
 
 # filename = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/data_usgcnn_total/0.npz"
-filename = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/data_300_usgcnn/2.npz"
+# filename = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/data_300_usgcnn/2.npz"
+filename = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/0.npz"
 file_mesh = "/afs/ihep.ac.cn/users/l/luoxj/gpu_500G/ugscnn/mesh_files/icosphere_5.pkl"
 batch = np.load(filename)
 pmtinfos = batch['pmtinfo']  # [idx % self.nevt_file]
 vertices = batch['vertex']  # [idx % self.nevt_file]
 edeps = batch['eqen']
 types = batch['eventtype']
+print("len(pmtinfos:", len(pmtinfos))
 E_low = 10
 E_high = 15
 for i,type in enumerate(types):
@@ -68,7 +70,7 @@ ax.set_ylabel("Detector Y")
 ax.set_zlabel("Detector Z")
 fig_eqen.colorbar(img_eqen)
 
-fig_eqen = plt.figure("hittime_intep")
+fig_eqen = plt.figure("hittime_intep_sig")
 ax = fig_eqen.add_subplot(111, projection='3d')
 # indices = (event2dimage_intep[0] != 0)
 # img_eqen = ax.scatter(x[indices], y[indices], z[indices], c=event2dimage_intep[0][indices], cmap=plt.hot(), s=1)

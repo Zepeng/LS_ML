@@ -471,9 +471,9 @@ def interp_pmt2mesh(sig_r2, thetas, phis, V, pmtmap, method="linear", do_calcgri
 def GetOneEventImage(pmtids:np.ndarray, hittime:np.ndarray, npes:np.ndarray, pmtmap:PMTIDMap, V,
                      do_calcgrid:str=False, max_n_points_grid:str=True):
     if do_calcgrid == False:
-        event2dimg = np.zeros((2, len(pmtmap.thetas)), dtype=np.float16)
+        event2dimg = np.zeros((2, len(pmtmap.thetas)), dtype=np.float32)
     else:
-        event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis)), dtype=np.float16)
+        event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis)), dtype=np.float32)
 
     # event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
     event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
@@ -505,7 +505,7 @@ def GetOneEventImage(pmtids:np.ndarray, hittime:np.ndarray, npes:np.ndarray, pmt
                 event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
 
     event2dimg_interp[0] = interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
-    event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
+    event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="nearest")
 
     return (event2dimg, event2dimg_interp)
 
@@ -560,8 +560,8 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
     eqen_batch = []
     vertices = []
     batchsize = bkgchain.GetEntries()  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
-    # batchsize = 20  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
-    print("batchsize:  ",bkgchain.GetEntries())
+    batchsize = 20  # because the entries in bkg file is fewer than in sig files ,so we set the batch size as entries contained in one bkg file
+    # print("batchsize:  ",bkgchain.GetEntries())
     # batchsize = 270
     for batchentry in range(batchsize):
         # save charge and hittime to 3D array
@@ -572,59 +572,11 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
             print("continued i_sig: ",i_sig)
             continue
         sigchain.GetEntry(i_sig)
-        bkgchain.GetEntry(batchentry)
-        pmtids = sigchain.PMTID
-        npes = sigchain.Charge
-        hittime = sigchain.Time
+        pmtids = np.array(sigchain.PMTID, dtype=np.int32)
+        npes = np.array(sigchain.Charge, dtype=np.float32)
+        hittime = np.array(sigchain.Time, dtype=np.float32)
         eqen = sigchain.Eqen
-        # pmtids = np.array(pmtids)
-        # print(f"pmtids.shape {len(pmtids)}")
-        # print(f"sig   E:{eqen},R:{x ** 2 + y ** 2 + z ** 2}")
-        # if eqen <= 30 and eqen >= 11 and x ** 2 + y ** 2 + z ** 2 <= 256000000:  # 16m*16m
-        # print("pmtids:   ", len(pmtids)) # 24154
-        # print("hittime:  ", len(hittime)) # 24154
-        # print("npes:   ", len(eqen)) # 1
 
-        # save charge and hittime to 3D array
-        # event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
-
-        ###################################################
-        # if do_calcgrid == False:
-        #     event2dimg = np.zeros((2, len(pmtmap.thetas)), dtype=np.float16)
-        # else:
-        #     event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis)), dtype=np.float16)
-        #
-        # # event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
-        # event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
-        # for j in range(len(pmtids)):
-        #     if pmtids[j] > 17612:
-        #         continue
-        #     if max_n_points_grid:
-        #         if do_calcgrid:
-        #             (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
-        #         else:
-        #             i_pmt = pmtids[j]
-        #     else:
-        #         (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
-        #     # if ybin>124:
-        #     #     print(pmtids[i][j])
-        #     if do_calcgrid == False:
-        #         event2dimg[0, i_pmt] += npes[j]
-        #         # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
-        #         if event2dimg[1, i_pmt] == 0:
-        #             event2dimg[1, i_pmt] = hittime[j]
-        #         else:
-        #             event2dimg[1, i_pmt] = min(hittime[j], event2dimg[1, i_pmt])
-        #     else:
-        #         event2dimg[0, xbin, ybin] += npes[j]
-        #         # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
-        #         if event2dimg[1, xbin, ybin] == 0:
-        #             event2dimg[1, xbin, ybin] = hittime[j]
-        #         else:
-        #             event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
-        #
-        # event2dimg_interp[0] = interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
-        # event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
 
         (event2dimg, event2dimg_interp) = GetOneEventImage(pmtids, hittime, npes, pmtmap, V, do_calcgrid, max_n_points_grid)
         if plot_result_sig:
@@ -637,47 +589,13 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         eqen_batch.append(eqen)
         vertices.append([sigchain.X, sigchain.Y, sigchain.Z])
 
-        pmtids = bkgchain.PMTID
-        npes = bkgchain.Charge
-        hittime = bkgchain.Time
+        bkgchain.GetEntry(batchentry)
+        pmtids = np.array(bkgchain.PMTID, dtype=np.int32)
+        npes = np.array(bkgchain.Charge, dtype=np.float32)
+        hittime = np.array(bkgchain.Time, dtype=np.float32)
         eqen = bkgchain.Eqen
 
-        # if do_calcgrid == False:
-        #     event2dimg = np.zeros((2, len(pmtmap.thetas)), dtype=np.float16)
-        # else:
-        #     event2dimg = np.zeros((2, len(pmtmap.thetas), len(pmtmap.phis)), dtype=np.float16)
-        #
-        # # event2dimg = np.zeros((2, n_grid, n_grid), dtype=np.float16)
-        # event2dimg_interp = np.zeros((2, len(V)), dtype=np.float32)
-        # for j in range(len(pmtids)):
-        #     if pmtids[j] > 17612:
-        #         continue
-        #     if max_n_points_grid:
-        #         if do_calcgrid:
-        #             (xbin, ybin) = pmtmap.CalcBin_ThetaPhiImage(pmtids[j])
-        #         else:
-        #             i_pmt = pmtids[j]
-        #     else:
-        #         (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
-        #     # if ybin>124:
-        #     #     print(pmtids[i][j])
-        #     if do_calcgrid == False:
-        #         event2dimg[0, i_pmt] += npes[j]
-        #         # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
-        #         if event2dimg[1, i_pmt] == 0:
-        #             event2dimg[1, i_pmt] = hittime[j]
-        #         else:
-        #             event2dimg[1, i_pmt] = min(hittime[j], event2dimg[1, i_pmt])
-        #     else:
-        #         event2dimg[0, xbin, ybin] += npes[j]
-        #         # if event2dimg[1, xbin, ybin] < 0.001 and event2dimg[1, xbin, ybin]>-0.001:
-        #         if event2dimg[1, xbin, ybin] == 0:
-        #             event2dimg[1, xbin, ybin] = hittime[j]
-        #         else:
-        #             event2dimg[1, xbin, ybin] = min(hittime[j], event2dimg[1, xbin, ybin])
-        #
-        # event2dimg_interp[0] = interp_pmt2mesh(event2dimg[0], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="linear")
-        # event2dimg_interp[1] = interp_pmt2mesh(event2dimg[1], pmtmap.thetas, pmtmap.phis, V, pmtmap, method="nearest")
+
         (event2dimg, event2dimg_interp) = GetOneEventImage(pmtids, hittime, npes, pmtmap, V, do_calcgrid, max_n_points_grid)
         if plot_result_bkg:
             PlotRawSignal(event2dimg, x_raw_grid, y_raw_grid, z_raw_grid)
@@ -690,12 +608,17 @@ def GetugscnnData(mapfile, sig_dir, bkg_dir, outfile='', start_entries=0):
         eqen_batch.append(eqen)
         # print("len(pmtinfos):  ",len(pmtinfos))
 
-    indices = np.arange(len(pmtinfos))
-    np.random.shuffle(indices)
-    pmtinfos = np.array(pmtinfos)[indices]
-    types = np.array(types, dtype=np.int32)[indices]
-    eqen_batch = np.array(eqen_batch)[indices]
-    vertices = np.array(vertices)[indices]
+    # indices = np.arange(len(pmtinfos))
+    # np.random.shuffle(indices)
+    # pmtinfos = np.array(pmtinfos)[indices]
+    # types = np.array(types, dtype=np.int32)[indices]
+    # eqen_batch = np.array(eqen_batch)[indices]
+    # vertices = np.array(vertices)[indices]
+
+    pmtinfos = np.array(pmtinfos)
+    types = np.array(types)
+    eqen_batch = np.array(eqen_batch)
+    vertices = np.array(vertices)
 
     save2npz(outfile, pmtinfos, types, eqen_batch, vertices)
     if len(pmtinfos) == 0:

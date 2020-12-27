@@ -20,13 +20,14 @@ best_acc = 0 # best test accuracy
 
 def adjust_learning_rate(optimizer, epoch, lr):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = lr*2**(-epoch)
+    lr = lr*0.5**epoch
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
 def flatten_batch(batch_arr):
     ar_shape = np.asarray(batch_arr.shape)
     ar_shape = np.insert(ar_shape[2:], 0, ar_shape[0]*ar_shape[1])
+    # ar_shape = np.insert(ar_shape[2:], 0, 1)
     return batch_arr.reshape(tuple(ar_shape))
 
 def train(trainloader, epoch):
@@ -138,7 +139,7 @@ if __name__ == "__main__":
 
     lr = 0.1
     momentum = 0.9
-    weight_decay = 1.0e-3
+    weight_decay = 1e-3
     batchsize = 50
     batchsize_valid = 500
     start_epoch = 0
@@ -146,7 +147,7 @@ if __name__ == "__main__":
     print('==> Building model..')
     # net = model.Model(2)
     net = model_meshcnn1.Model(mesh_folder="/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/mesh_files/", nclasses=2)
-    # net = model_meshcnn2.Model(mesh_folder="./mesh_files/", nclasses=2)
+    # net = model_meshcnn2.Model(mesh_folder="/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/mesh_files/", nclasses=2)
     # define loss function (criterion) and optimizer
     criterion = torch.nn.CrossEntropyLoss().cuda()
     # criterion = F.nll_loss().cuda()
