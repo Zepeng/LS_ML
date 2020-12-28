@@ -76,5 +76,8 @@ class Model(nn.Module):
         x = torch.squeeze(self.avg(x))
         x = F.dropout(x, training=self.training)
         x = self.out_layer(x)
-
-        return F.log_softmax(x, dim=1)
+        if x.shape==torch.Size([2]): #This case is for one event input
+            dimension = 0
+        else:
+            dimension = 1
+        return F.log_softmax(x, dim=dimension)
