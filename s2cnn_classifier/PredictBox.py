@@ -98,8 +98,12 @@ def Loadnpz(filename: str):
 
 def RawDataPredictResult(rawfilechain: ROOT.TChain, pmtmap: PMTIDMap, net, V, name_tpyes: str = " ", name_file_train="./0.npz"):
     global __n_RawDataPredictEvt__
+    CheckWhetherEqual:bool = False
     # print(__n_RawDataPredictEvt__)
+    OneByOne = False
     plot_result = False
+    ChangeRNRatio = False
+    SingleEvetInput = False
     max_n_points_grid: bool = True
     do_calcgrid: bool = False
 
@@ -120,7 +124,7 @@ def RawDataPredictResult(rawfilechain: ROOT.TChain, pmtmap: PMTIDMap, net, V, na
         z_raw_grid = np.sin(THETAS)
         x_V, y_V, z_V = V[:, 0], V[:, 1], V[:, 2]
 
-    fsoftmax = nn.Softmax(dim=1)
+    fsoftmax = nn.Softmax(dim=0)
     results = []
     pmtinfos = []
     types = []
@@ -163,36 +167,93 @@ def RawDataPredictResult(rawfilechain: ROOT.TChain, pmtmap: PMTIDMap, net, V, na
         vertices = np.array(vertices)
 
         (pmtinfos_loadnpz, types_loadnpz, eqen_loadnpz) = Loadnpz(name_file_train)
-        # if name_tpyes == "Signal":
-        #     pmtinfos_loadnpz = pmtinfos_loadnpz[::2]
-        #     types_loadnpz = types_loadnpz[::2]
-        #     print(f"check whether is {name_tpyes} :  {types[::2]}")
-        #     print((pmtinfos[:len(pmtinfos_loadnpz)]-pmtinfos_loadnpz[:len(pmtinfos)]==0).all())
-        # else:
-        #     pmtinfos_loadnpz = pmtinfos_loadnpz[1::2]
-        #     types_loadnpz = types_loadnpz[1::2]
-        #     print(f"check whether is {name_tpyes} :  {types[1::2]}")
-        #     print((pmtinfos[:len(pmtinfos_loadnpz)]-pmtinfos_loadnpz[:len(pmtinfos)]==0).all())
-            # exit()
 
-        pmtinfos_loadnpz = pmtinfos_loadnpz[:3:2]
-        types_loadnpz = types_loadnpz[:3:2]
-        save2npz("./try_save.npz", pmtinfos, types, eqen_batch, vertices)
-        inputs = torch.from_numpy(np.array(pmtinfos_loadnpz))
-        print(inputs)
-        inputs  = inputs.to(device)
-        outputs = net(inputs)
-        outputs = fsoftmax(outputs)
-        _, predicted = outputs.max(1)
-        correct = predicted.eq(torch.from_numpy(types_loadnpz)).sum().item()
-        results= predicted.numpy()
-        print(name_tpyes," :  ",results)
-        print(name_tpyes," :  ",Counter(np.array(results)))
+        if CheckWhetherEqual:
+            if name_tpyes == "Signal":
+                pmtinfos_loadnpz = pmtinfos_loadnpz[::2]
+                types_loadnpz = types_loadnpz[::2]
+                print(f"check whether is {name_tpyes} :  {types[::2]}")
+                print((pmtinfos[:len(pmtinfos_loadnpz)]-pmtinfos_loadnpz[:len(pmtinfos)]==0).all())
+            else:
+                pmtinfos_loadnpz = pmtinfos_loadnpz[1::2]
+                types_loadnpz = types_loadnpz[1::2]
+                print(f"check whether is {name_tpyes} :  {types[1::2]}")
+                print((pmtinfos[:len(pmtinfos_loadnpz)]-pmtinfos_loadnpz[:len(pmtinfos)]==0).all())
+                # exit()
+        # save2npz("./try_save.npz", pmtinfos, types, eqen_batch, vertices)
 
-        print(types_loadnpz)
-        print("Score: ", correct/len(types_loadnpz))
+        if ChangeRNRatio:
+            n_0 = 30
+            n_1 = 30
+            pmtinfos_input = np.array(pmtinfos_loadnpz[:n_0:2])
+            print("Before append:   ",pmtinfos_input.shape)
+            pmtinfos_input = np.concatenate((pmtinfos_input, pmtinfos_loadnpz[1:n_1:2]))
+            print("After append:   ",pmtinfos_input.shape)
+            types_input = types_loadnpz[:n_0:2]
+            types_input = np.append(types_input, types_loadnpz[1:n_1:2])
+            # print(types_input)
+        else:
+            pmtinfos_input = pmtinfos_loadnpz
+            types_input = types_loadnpz
 
+        if SingleEvetInput:
+            print("Before put into single:  ",pmtinfos_input.shape)
+            pmtinfos_input = pmtinfos_input[0].reshape(1, 2, 10242)
+            print("After put into single:   ",pmtinfos_input.shape)
+            types_input = types_input[0]
 
+        if OneByOne:
+            PredictEventOneByOne(pmtinfos_input, types_input)
+        else:
+            PredictEventOneBatch(pmtinfos_input, types_input)
+        # inputs = torch.from_numpy(np.array(pmtinfos_input))
+        # inputs  = inputs.to(device)
+        # outputs = net(inputs)
+        # outputs = fsoftmax(outputs)
+        # print("output: ", outputs)
+        # _, predicted = outputs.max(0)
+        # # correct = predicted.eq(torch.from_numpy(types_input)).sum().item()
+        # results= predicted.numpy()
+        # print(name_tpyes," Prediction :  ",results, ",   Answer :",types_input)
+        # print(name_tpyes," :  ",Counter(np.array(results)))
+
+        # print("Score: ", correct/len(types_input))
+
+def PredictEventOneByOne(pmtinfos, types):
+    fsoftmax = nn.Softmax(dim=0)
+    ar_shape = np.asarray(pmtinfos.shape)
+    ar_shape = np.insert(ar_shape[1:], 0, 1)
+    predictions = []
+    with torch.no_grad():
+        for i in range(len(pmtinfos)):
+            pmtinfos_input = pmtinfos[i].reshape(tuple(ar_shape))
+            types_input = types[i]
+            inputs = torch.from_numpy(np.array(pmtinfos_input))
+            inputs  = inputs.to(device)
+            outputs = net(inputs)
+            outputs = fsoftmax(outputs)
+            print("output: ", outputs)
+            _, predicted = outputs.max(0)
+            # correct = predicted.eq(torch.from_numpy(types_input)).sum().item()
+            results= predicted.item()
+            predictions.append(results)
+            print(" Prediction :  ",results, ",   Answer :",types_input)
+    print("Prediction : ", predictions, "  , Answer :  ", types)
+    print(Counter(predictions==types))
+def PredictEventOneBatch(pmtinfos, types, name_types=""):
+    fsoftmax = nn.Softmax(dim=1)
+    inputs = torch.from_numpy(np.array(pmtinfos))
+    inputs  = inputs.to(device)
+    outputs = net(inputs)
+    outputs = fsoftmax(outputs)
+    print("output: ", outputs)
+    _, predicted = outputs.max(1)
+    correct = predicted.eq(torch.from_numpy(types)).sum().item()
+    results= predicted.numpy()
+    print(name_types," Prediction :  ",results, ",   Answer :",types)
+    # print(name_tpyes," :  ",Counter(np.array(results)))
+
+    print("Score: ", correct/len(types))
 def npzPredictResult(filename: str, net):
     with torch.no_grad():
         fsoftmax = nn.Softmax(dim=1)
@@ -223,7 +284,7 @@ if __name__ == "__main__":
     file_model = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/usgcnn_train_TimeNearest_lr0.5decay/checkpoint_sens/ckpt.t7"
     # filename = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/data_usgcnn_TimeNearest/0.npz"
     # filename = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/try_save.npz"
-    filename = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/0.npz"
+    filename = "/afs/ihep.ac.cn/users/l/luoxj/s2cnn_classifier/0_noShuffle.npz"
     file_mesh = "/afs/ihep.ac.cn/users/l/luoxj/gpu_500G/ugscnn/mesh_files/icosphere_5.pkl"
     mapfile = "/cvmfs/juno.ihep.ac.cn/centos7_amd64_gcc830/Pre-Release/J20v1r0-Pre2/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv"
     rawfile_bkg = "/workfs/exo/zepengli94/JUNO_DSNB/AtmNu/data/atm_000001.root"
