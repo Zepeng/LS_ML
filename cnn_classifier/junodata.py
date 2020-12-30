@@ -1,7 +1,9 @@
 import os, glob
-import json, torch
+import json, torch, h5py
 import numpy as np
 import torch.utils.data as data
+from torchvision import transforms
+import pandas as pd
 
 class SingleJsonDataset(data.Dataset):
     filename = ''
@@ -62,14 +64,34 @@ class BatchDataset(data.Dataset):
                 torch.from_numpy(np.array(types)).to(torch.float32),\
                 torch.from_numpy(np.array(edeps)).to(torch.float32)
 
+class H5Dataset(data.Dataset):
+    csv_path = ''
+    h5file = 0
+    h5dset = 0
+    datainfo = 0
+    def __init__(self, h5_path, csv_path):
+        self.to_tensor = transforms.ToTensor()
+        csv_info = pd.read_csv(csv_path, header=None)
+        self.datainfo = np.asarray(csv_info.iloc[:, 0])
+        self.h5file = h5py.File(h5_path, 'r')
+        self.h5dset = self.h5file['juno_data']
+
+    def __len__(self):
+        return len(self.datainfo)
+
+    def __getitem__(self, idx):
+        dset_entry = self.h5dset[self.datainfo[idx]]
+        eventtype = dset_entry.attrs[u'tag']
+        vertex = dset_entry.attrs[u'vertex']
+        eqen = dset_entry.attrs[u'eqen']
+        pmtinfo = np.array(dset_entry)
+        print(pmtinfo.shape)
+        return torch.from_numpy(pmtinfo), eventtype
+
+
 def test():
-    list_of_datasets = []
-    filelist = glob.glob('./npz_files/*.npz')
-    dataset = BatchDataset(filelist, 500)
-    for i in range(len(filelist)):
-        print(filelist[i])
-        print(dataset[i][2][0])
-    #print(i, dataset[i][0].shape)
+    dataset = H5Dataset('/scratchfs/exo/zepengli94/outfiles/dsnb_000148.h5', 'image2dcharge_sens.csv')
+    print(0, dataset[0][0].shape)
 
 if __name__ == '__main__':
     test()
