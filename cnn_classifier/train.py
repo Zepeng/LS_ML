@@ -37,7 +37,6 @@ def train(trainloader, epoch):
     total = 0
     fsoftmax = nn.Softmax(dim=1)
     for batch_idx, (inputs, targets, spectators) in enumerate(trainloader):
-        inputs, targets = flatten_batch(inputs), flatten_batch(targets)
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
@@ -63,8 +62,6 @@ def test(testloader, epoch):
     fsoftmax = nn.Softmax(dim=1)
     with torch.no_grad():
         for batch_idx, (inputs, targets, spectators) in enumerate(testloader):
-            inputs, targets = flatten_batch(inputs), flatten_batch(targets)
-            spectators = flatten_batch(spectators)
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
             outputs = fsoftmax(outputs)
@@ -97,40 +94,35 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch 1d conv net classifier')
     parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
-    parser.add_argument('--filedir', '-i', type=str, help='directory of dataset files.')
+    parser.add_argument('--csvfile', '-c', type=str, help='location of csv file of dataset infor.')
+    parser.add_argument('--h5file', '-f', type=str, help='location of hdf5 file.')
     args = parser.parse_args()
-    #transformations = transforms.Compose([transforms.ToTensor()])
     # Data
     print('==> Preparing data..')
-    list_of_datasets = []
-    import glob
-    filelist = glob.glob('%s/*.npz' % args.filedir)
-    batch_dataset = junodata.BatchDataset(filelist, 500)
-
-    # Creating data indices for training and validation splits:
-    dataset_size = len(batch_dataset)
+    dataset = junodata.H5Dataset(args.h5file, args.csvfile)
+    dataset_size = len(dataset)
     indices = list(range(dataset_size))
-    validation_split = .1
+    validation_split = .15
     split = int(np.floor(validation_split * dataset_size))
     shuffle_dataset = True
     random_seed= 42
     if shuffle_dataset :
         np.random.seed(random_seed)
         np.random.shuffle(indices)
-        train_indices, val_indices = indices[split:], indices[:split]
+    train_indices, val_indices = indices[split:], indices[:split]
     # Creating PT data samplers and loaders:
     train_sampler = SubsetRandomSampler(train_indices)
     validation_sampler = SubsetRandomSampler(val_indices)
-    train_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=train_sampler, num_workers=4)
-    validation_loader = torch.utils.data.DataLoader(batch_dataset, batch_size=1, sampler=validation_sampler, num_workers=4)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=400, sampler=train_sampler, num_workers=4)
+    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=400, sampler=validation_sampler, num_workers=4)
 
+    #initialize the training parameters.
     lr = 1.0e-3
     momentum = 0.9
     weight_decay = 1.0e-3
     batchsize = 50
     batchsize_valid = 500
     start_epoch = 0
-
     print('==> Building model..')
     net = resnet.resnet18()
     # define loss function (criterion) and optimizer
