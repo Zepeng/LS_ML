@@ -18,11 +18,10 @@ class H5Dataset(data.Dataset):
 
     def __getitem__(self, idx):
         dset_entry = self.h5dset[self.groupname[idx]][self.datainfo[idx]]
-        eventtype = dset_entry.attrs[u'tag']
         vertex = dset_entry.attrs[u'vertex']
-        eqen = dset_entry.attrs[u'eqen']
+        eqen = dset_entry.attrs[u'edep']
         pmtinfo = np.array(dset_entry)
-        return torch.from_numpy(pmtinfo).type(torch.FloatTensor), eventtype, eqen
+        return torch.from_numpy(pmtinfo).type(torch.FloatTensor), vertex, eqen
 
 
 def test():
