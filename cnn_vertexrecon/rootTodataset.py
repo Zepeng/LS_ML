@@ -1,7 +1,5 @@
 import uproot as up
 import numpy as np
-import scipy
-import matplotlib.pyplot as plt
 import argparse
 
 class PMTIDMap():
@@ -44,43 +42,57 @@ class PMTIDMap():
 
     def CalcBin(self, pmtid):
         if pmtid > self.maxpmtid:
-            print('Wrong PMT ID')
+            #print('Wrong PMT ID')
             return (0, 0)
         (pmtid, x, y, z, theta, phi) = self.pmtmap[str(pmtid)]
         ybin = np.where(self.thetas == theta)[0]
-        xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)
+        xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 113 - int(len(self.thetaphi_dict[str(theta)])/2)
         return(xbin, ybin)
 
-def roottonpz(mapfile, rootfile, outfile=''):
+def uptohdf(mapfile, infile, outfile=''):
     # The csv file of PMT map must have the same tag as the MC production.
+    print('Start processing')
     pmtmap = PMTIDMap(mapfile)
     pmtmap.CalcDict()
 
-    uptree = up.open(rootfile)['data']
+    print('Read ROOT file:', infile)
+    uptree = up.open(infile)['evt']
     pmtids = uptree.array('pmtID')
     edepxs = uptree.array('edepX')
     edepys = uptree.array('edepY')
     edepzs = uptree.array('edepZ')
     edeps  = uptree.array('edep')
-    npes   = uptree.array('npe')
-    hittime= uptree.array('hittime')
-    pmtinfos = []
-    vertices = []
+    npes   = uptree.array('nPE')
+    hittime= uptree.array('hitTime')
+    import h5py    # HDF5 support
+    import six
+    import os, time
+    print("Write a HDF5 file")
+    fileName = outfile
+    timestamp = u'%s' % time.ctime()
 
-    for i in range(len(pmtids)):
-        #save charge and hittime to 3D array
-        event2dimg = np.zeros((2, 225, 124), dtype=np.float16)
-        for j in range(len(pmtids[i])):
-            (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
-            event2dimg[0, xbin, ybin] += npes[i][j]
-            event2dimg[1, xbin, ybin] += hittime[i][j]
-        pmtinfos.append(event2dimg)
-        vertices.append(np.array([edepxs[i], edepys[i], edepzs[i]]))
-
-    if outfile == '':
-        np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), vertex=np.array(vertices))
-    else:
-        np.savez(outfile, pmtinfo=np.array(pmtinfos), vertex=np.array(vertices), edep=edeps)
+    # create the HDF5 file
+    f = h5py.File(fileName, "w")
+    # point to the default data to be plotted
+    f.attrs[u'default']          = u'entry'
+    # give the HDF5 root some more attributes
+    f.attrs[u'file_name']        = fileName
+    f.attrs[u'file_time']        = timestamp
+    f.attrs[u'creator']          = u'rootTodataset.py'
+    f.attrs[u'HDF5_Version']     = six.u(h5py.version.hdf5_version)
+    f.attrs[u'h5py_version']     = six.u(h5py.version.version)
+    junodata = f.create_group(u'juno_data')
+    for entry in range(uptree.numentries):
+        print(entry)
+        event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
+        for j in range(len(pmtids[entry])):
+            (xbin, ybin) = pmtmap.CalcBin(pmtids[entry][j])
+            event2dimg[0, xbin, ybin] += npes[entry][j]
+            event2dimg[1, xbin, ybin] += hittime[entry][j]
+        dset = junodata.create_dataset(os.path.basename(outfile) + str(entry), data=event2dimg, dtype='float16')
+        dset.attrs[u'vertex'] = [edepxs[entry], edepys[entry], edepzs[entry]]
+        dset.attrs[u'edep'] = edeps[entry]
+    f.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
@@ -88,5 +100,4 @@ if __name__ == '__main__':
     parser.add_argument('--infile', '-i', type=str, help='Input root file.')
     parser.add_argument('--outfile', '-o', type=str, help='Output root file.')
     args = parser.parse_args()
-    roottonpz(args.pmtmap, args.infile, args.outfile)
-    #'/cvmfs/juno.ihep.ac.cn/sl6_amd64_gcc830/Pre-Release/J19v1r1-Pre4/offline/Simulation/DetSimV2/DetSimOptions/data/PMTPos_Acrylic_with_chimney.csv', '/junofs/users/lizy/public/deeplearning/J19v1r0-Pre3/samples/train/eplus_ekin_0_10MeV/0/root_data/sample_0.root')
+    uptohdf(args.pmtmap, args.infile, args.outfile)
