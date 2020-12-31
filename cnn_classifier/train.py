@@ -113,8 +113,8 @@ if __name__ == "__main__":
     # Creating PT data samplers and loaders:
     train_sampler = SubsetRandomSampler(train_indices)
     validation_sampler = SubsetRandomSampler(val_indices)
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=400, sampler=train_sampler, num_workers=4)
-    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=400, sampler=validation_sampler, num_workers=4)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=400, sampler=train_sampler, num_workers=12)
+    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=400, sampler=validation_sampler, num_workers=12)
 
     #initialize the training parameters.
     lr = 1.0e-3
@@ -147,10 +147,10 @@ if __name__ == "__main__":
         net.load_state_dict(checkpoint['net'])
         best_acc = checkpoint['acc']
         start_epoch = checkpoint['epoch'] + 1
-    y_train_loss = np.zeros(100)
-    y_train_acc = np.zeros(100)
-    y_test_loss = np.zeros(100)
-    y_test_acc  = np.zeros(100)
+    y_train_loss = np.array([])
+    y_train_acc = np.array([])
+    y_test_loss = np.array([])
+    y_test_acc  = np.array([])
     test_score = []
     start_time = time.time()
     for epoch in range(start_epoch, start_epoch + 20):
@@ -170,8 +170,8 @@ if __name__ == "__main__":
                 traceback.print_exc(e)
                 break
             print("Epoch [%d] train aveloss=%.3f aveacc=%.3f"%(epoch,train_ave_loss,train_ave_acc))
-            y_train_loss[epoch] = train_ave_loss
-            y_train_acc[epoch]  = train_ave_acc
+            y_train_loss = np.append(y_train_loss, train_ave_loss)
+            y_train_acc = np.append(y_train_acc, train_ave_acc)
 
             # evaluate on validationset
             try:
@@ -183,8 +183,8 @@ if __name__ == "__main__":
                 traceback.print_exc(e)
                 break
             print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,test_acc,test_loss))
-            y_test_loss[epoch] = test_loss
-            y_test_acc[epoch] = test_acc
+            y_test_loss = np.append(y_test_loss, test_loss)
+            y_test_acc = np.append(y_test_acc, test_acc)
             test_score.append(score)
         epoch_elapse = time.time() - epoch_start
         print('Epoch %d used %f seconds' % (epoch, epoch_elapse))
