@@ -51,149 +51,6 @@ class PMTIDMap():
         xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)
         return(xbin, ybin)
 
-def roottonpz(mapfile, rootfile, outfile='', eventtype='sig', batchsize = 100):
-    # The csv file of PMT map must have the same tag as the MC production.
-    pmtmap = PMTIDMap(mapfile)
-    pmtmap.CalcDict()
-
-    uptree = up.open(rootfile)['psdtree']
-    pmtids = uptree.array('PMTID')
-    npes   = uptree.array('Charge')
-    hittime= uptree.array('Time')
-    eqens  = uptree.array('eqen')
-    nbatches = int(len(pmtids)/batchsize)
-    if len(pmtids) > batchsize*nbatches:
-        nbatches += 1
-
-    for batch in range(nbatches):
-        pmtinfos = []
-        types = []
-        eqen_batch = []
-        for batchentry in range(batchsize):
-            #save charge and hittime to 3D array
-            event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
-            i = batchsize*batch + batchentry
-            if i >= len(pmtids):
-                continue
-            for j in range(len(pmtids[i])):
-                (xbin, ybin) = pmtmap.CalcBin(pmtids[i][j])
-                event2dimg[0, xbin, ybin] += npes[i][j]
-                event2dimg[1, xbin, ybin] += hittime[i][j]
-            pmtinfos.append(event2dimg)
-            if eventtype == 'sig':
-                types.append(1)
-            else:
-                types.append(0)
-            eqen_batch.append(eqens[i])
-
-        if outfile == '':
-            np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types))
-        else:
-            np.savez(outfile + str(batch) + 'npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types), eqen=np.array(eqen_batch))
-
-def chaintonpz(mapfile, sig_dir, bkg_dir, outfile='', batch_num = 100, batchsize = 500):
-    # The csv file of PMT map must have the same tag as the MC production.
-    print('Start processing')
-    pmtmap = PMTIDMap(mapfile)
-    pmtmap.CalcDict()
-
-    print('Read ROOT files.')
-    sigchain = ROOT.TChain('psdtree')
-    sigchain.Add('%s/*root' % sig_dir)
-    bkgchain = ROOT.TChain('psdtree')
-    bkgchain.Add('%s/*root' % bkg_dir)
-
-    print('Build outout numpy array')
-    pmtinfos = []
-    types = []
-    eqen_batch = []
-    vertices = []
-    for batchentry in range(int(batchsize/2)):
-        #save charge and hittime to 3D array
-        i = int(batchsize/2)*batch_num + batchentry
-        if i >= sigchain.GetEntries() or i >= bkgchain.GetEntries():
-            continue
-        sigchain.GetEntry(i)
-        bkgchain.GetEntry(i)
-        print('entry', i)
-        pmtids = sigchain.PMTID
-        npes = sigchain.Charge
-        hittime = sigchain.Time
-        eqen = sigchain.Eqen
-        event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
-        for j in range(len(pmtids)):
-            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
-            event2dimg[0, xbin, ybin] += npes[j]
-            event2dimg[1, xbin, ybin] += hittime[j]
-        pmtinfos.append(event2dimg)
-        types.append(1)
-        eqen_batch.append(eqen)
-        vertices.append([sigchain.X, sigchain.Y, sigchain.Z])
-        pmtids = bkgchain.PMTID
-        npes = bkgchain.Charge
-        hittime = bkgchain.Time
-        eqen = bkgchain.Eqen
-        event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
-        for j in range(len(pmtids)):
-            (xbin, ybin) = pmtmap.CalcBin(pmtids[j])
-            event2dimg[0, xbin, ybin] += npes[j]
-            event2dimg[1, xbin, ybin] += hittime[j]
-        pmtinfos.append(event2dimg)
-        types.append(0)
-        vertices.append([bkgchain.X, bkgchain.Y, bkgchain.Z])
-        eqen_batch.append(eqen)
-
-    indices = np.arange(len(pmtinfos))
-    np.random.shuffle(indices)
-    if outfile == '':
-        np.save('data_fake.npz', pmtinfo=np.array(pmtinfos), eventtype=np.array(types))
-    else:
-        np.savez(outfile , pmtinfo=np.array(pmtinfos)[indices], eventtype=np.array(types)[indices], eqen=np.array(eqen_batch)[indices], vertex=np.array(vertices)[indices])
-
-def uptotar(mapfile, infile, outfile='', eventtype=0):
-    # The csv file of PMT map must have the same tag as the MC production.
-    import tarfile, os
-    import io   # python3 version
-
-    print('Start processing')
-    pmtmap = PMTIDMap(mapfile)
-    pmtmap.CalcDict()
-
-    print('Read ROOT files.', infile)
-
-    print('Build outout numpy array')
-    pmtinfos = []
-    types = []
-    eqen_batch = []
-    vertices = []
-    branches = ['PMTID', 'Charge', 'Time', 'Eqen', 'X', 'Y', 'Z']
-    import uproot
-    df = uproot.open(infile)['psdtree']
-    #save charge and hittime to 3D array
-    print(df.keys())
-    pmtids = df.array(b'PMTID')
-    npes = df.array(b'Charge')
-    hittime = df.array(b'Time')
-    eqen = df.array(b'Eqen')
-    Xs = df.array(b'X')
-    Ys = df.array(b'Y')
-    Zs = df.array(b'Z')
-    tar = tarfile.TarFile(outfile, 'w')
-    for entry in range(df.numentries):
-        print(entry)
-        abuf = io.BytesIO()
-        event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
-        for j in range(len(pmtids[entry])):
-            (xbin, ybin) = pmtmap.CalcBin(pmtids[entry][j])
-            event2dimg[0, xbin, ybin] += npes[entry][j]
-            event2dimg[1, xbin, ybin] += hittime[entry][j]
-        np.savez( abuf, pmtinfo=event2dimg, eventtype=np.array(eventtype), eqen=np.array(eqen[entry]), vertex=np.array([Xs[entry], Ys[entry], Zs[entry]]))
-        abuf.seek(0)
-        info = tarfile.TarInfo(name=os.path.basename(outfile) + str(entry) + '.npz')
-        info.size=len(abuf.getbuffer())
-        tar.addfile(tarinfo=info, fileobj=abuf)
-    tar.close()
-
 def uptohdf(mapfile, infile, outfile='', eventtype=0):
     # The csv file of PMT map must have the same tag as the MC production.
     print('Start processing')
@@ -227,9 +84,8 @@ def uptohdf(mapfile, infile, outfile='', eventtype=0):
 
     # create the HDF5 file
     f = h5py.File(fileName, "w")
-    # point to the default data to be plotted
-    f.attrs[u'default']          = u'entry'
     # give the HDF5 root some more attributes
+    f.attrs[u'sourcefile']       = infile
     f.attrs[u'file_name']        = fileName
     f.attrs[u'file_time']        = timestamp
     f.attrs[u'creator']          = u'DSNBDataset_v1.py'
@@ -248,6 +104,7 @@ def uptohdf(mapfile, infile, outfile='', eventtype=0):
         dset.attrs[u'vertex'] = [Xs[entry], Ys[entry], Zs[entry]]
         dset.attrs[u'eqen'] = eqen[entry]
     f.close()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='JUNO ML dataset builder.')
     parser.add_argument('--pmtmap', type=str, help='csc file of PMT map in JUNO.')
