@@ -23,11 +23,6 @@ def adjust_learning_rate(optimizer, epoch, lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
-def flatten_batch(batch_arr):
-    ar_shape = np.asarray(batch_arr.shape)
-    ar_shape = np.insert(ar_shape[2:], 0, ar_shape[0]*ar_shape[1])
-    return batch_arr.reshape(tuple(ar_shape))
-
 def train(trainloader, epoch):
     print('\nEpoch: %d' % epoch)
     net.train()
