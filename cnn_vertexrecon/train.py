@@ -135,22 +135,20 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=500, sampler=train_sampler, num_workers=12)
     validation_loader = torch.utils.data.DataLoader(dataset, batch_size=500, sampler=validation_sampler, num_workers=12)
 
-    lr = args.lr
     momentum = 0.9
     weight_decay = 1.0e-3
     start_epoch = 0
 
     print('==> Building model..')
     net = resnet.resnet18()
+    net = net.to(device)
     #use DataParallel if multiple GPUs are available
-    # Do not use this until the dataloader is updated, current dataloader blows up the memory.
     if torch.cuda.device_count() > 1:
         print("Let's use ", torch.cuda.device_count(), " GPUs!")
         net = torch.nn.DataParallel(net, device_ids=list(range(torch.cuda.device_count())))
     # We use SGD
-    optimizer = torch.optim.Adam(net.parameters(), lr, weight_decay=weight_decay)
+    optimizer = torch.optim.Adam(net.parameters(), args.lr, weight_decay=weight_decay)
 
-    net = net.to(device)
     if args.resume and os.path.exists('./checkpoint_sens/ckpt.t7'):
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
