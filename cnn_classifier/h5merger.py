@@ -4,6 +4,7 @@ import h5py    # HDF5 support
 import glob
 import time
 import csv
+import argparse
 
 def h5merger(filedir, csvfile, outfile):
     filelist = glob.glob('%s/*.h5' % filedir)
@@ -27,4 +28,4 @@ if __name__ == '__main__':
     parser.add_argument('--outfile', '-o', type=str, help='output h5 file.')
     parser.add_argument('--csvfile', '-c', type=str, help='csv file of dataset info.')
     args = parser.parse_args()
-    (args.filedir, args.csvfile, args.outfile)
+    h5merger(args.filedir, args.csvfile, args.outfile)
