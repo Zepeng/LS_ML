@@ -91,7 +91,7 @@ def uptohdf(mapfile, infile, outfile=''):
                 continue
             event2dimg[0, xbin, ybin] += npes[entry][j]
             event2dimg[1, xbin, ybin] += hittime[entry][j]
-        dset = junodata.create_dataset(os.path.basename(outfile) + str(entry), data=event2dimg, dtype='f2')
+        dset = junodata.create_dataset(os.path.basename(outfile).replace('h5',str(entry)), data=event2dimg, dtype='f2')
         dset.attrs[u'vertex'] = [edepxs[entry], edepys[entry], edepzs[entry]]
         dset.attrs[u'edep'] = edeps[entry]
     f.close()
