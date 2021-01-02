@@ -21,11 +21,12 @@ class H5Dataset(data.Dataset):
         vertex = dset_entry.attrs[u'vertex']
         eqen = dset_entry.attrs[u'edep']
         pmtinfo = np.array(dset_entry)
-        return torch.from_numpy(pmtinfo).type(torch.FloatTensor), vertex, eqen
+        return torch.from_numpy(pmtinfo).to(torch.float32), \
+                torch.from_numpy(vertex).to(torch.float32), eqen
 
 
 def test():
-    dataset = H5Dataset('test1.h5', 'dataset_info.csv')
+    dataset = H5Dataset('vertex_dataset.h5', 'dataset_info.csv')
     print(0, dataset[0][0].shape)
 
 if __name__ == '__main__':
