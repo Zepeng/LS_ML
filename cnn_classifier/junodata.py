@@ -11,13 +11,12 @@ class H5Dataset(data.Dataset):
         self.groupname = np.asarray(csv_info.iloc[:,0])
         self.datainfo = np.asarray(csv_info.iloc[:,1])
         self.h5file = h5py.File(h5_path, 'r')
-        self.h5dset = self.h5file['juno_data']
 
     def __len__(self):
         return len(self.datainfo)
 
     def __getitem__(self, idx):
-        dset_entry = self.h5dset[self.groupname[idx]][self.datainfo[idx]]
+        dset_entry = self.h5file[self.groupname[idx]][self.datainfo[idx]]
         eventtype = dset_entry.attrs[u'tag']
         vertex = dset_entry.attrs[u'vertex']
         eqen = dset_entry.attrs[u'eqen']
