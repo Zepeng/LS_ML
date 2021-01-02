@@ -88,6 +88,7 @@ def test(testloader, epoch):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch 1d conv net classifier')
     parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
+    parser.add_argument('--batchsize', '-b', default=400, type=int, help='batch size')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument('--csvfile', '-c', type=str, help='location of csv file of dataset infor.')
     parser.add_argument('--h5file', '-f', type=str, help='location of hdf5 file.')
@@ -108,8 +109,8 @@ if __name__ == "__main__":
     # Creating PT data samplers and loaders:
     train_sampler = SubsetRandomSampler(train_indices)
     validation_sampler = SubsetRandomSampler(val_indices)
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=400, sampler=train_sampler, num_workers=12)
-    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=400, sampler=validation_sampler, num_workers=12)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batchsize, sampler=train_sampler, num_workers=12)
+    validation_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batchsize, sampler=validation_sampler, num_workers=12)
 
     #initialize the training parameters.
     momentum = 0.9
