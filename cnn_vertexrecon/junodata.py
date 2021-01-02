@@ -11,13 +11,12 @@ class H5Dataset(data.Dataset):
         self.groupname = np.asarray(csv_info.iloc[:,0])
         self.datainfo = np.asarray(csv_info.iloc[:,1])
         self.h5file = h5py.File(h5_path, 'r')
-        self.h5dset = self.h5file['juno_data']
 
     def __len__(self):
         return len(self.datainfo)
 
     def __getitem__(self, idx):
-        dset_entry = self.h5dset[self.groupname[idx]][self.datainfo[idx]]
+        dset_entry = self.h5file[self.groupname[idx]][self.datainfo[idx]]
         vertex = dset_entry.attrs[u'vertex']
         eqen = dset_entry.attrs[u'edep']
         pmtinfo = np.array(dset_entry)
@@ -26,7 +25,7 @@ class H5Dataset(data.Dataset):
 
 
 def test():
-    dataset = H5Dataset('vertex_dataset.h5', 'dataset_info.csv')
+    dataset = H5Dataset('test.h5', 'test.csv')
     print(0, dataset[0][0].shape)
 
 if __name__ == '__main__':

@@ -11,16 +11,13 @@ def h5merger(filedir, csvfile, outfile):
     fieldnames = ['groupname', 'dsetname']
     writer = csv.DictWriter(csvfile, fieldnames)
     with h5py.File(outfile, 'w') as fid:
-        junodata = fid.create_group(u'juno_data' )
         for i in range(len(filelist)):
             import os, time
             print(os.stat(filelist[i]).st_ctime - time.time())
-            if os.stat(filelist[i]).st_ctime - time.time() > -10:
-                continue
             fileName = filelist[i]
             print(fileName)
             f = h5py.File(fileName,  "r")
-            f.copy(f['juno_data'], junodata, name='juno_data_%d' % i)
+            f.copy(f['juno_data'], fid['/'], name='juno_data_%d' % i)
             dset = f['juno_data']
             for item in dset.keys():
                 writer.writerow({'groupname':'juno_data_%d' % i, 'dsetname':item})
