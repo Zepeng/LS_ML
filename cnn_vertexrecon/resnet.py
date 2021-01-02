@@ -355,7 +355,13 @@ def wide_resnet101_2(pretrained=False, progress=True, **kwargs):
 
 def test():
     net = resnet18()
+    import h5py
+    import numpy as np
+    f = h5py.File('vertex_dataset.h5', 'r')
+    group = f['juno_data']
+    dset = group['juno_data_733']['user-detsim-848.h5747']
+    x1 = torch.from_numpy(np.array([dset])).to(torch.float32)
     x = torch.rand(1, 2, 225, 125)
-    print(x.dtype)
-    print(net(x))
-#test()
+    print(net(x), net(x1))
+if __name__ == '__main__':
+    test()
