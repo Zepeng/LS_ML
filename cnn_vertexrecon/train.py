@@ -59,7 +59,6 @@ def train(trainloader, epoch):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
-        print(outputs, targets)
         if torch.isnan(outputs).any():
             import sys
             sys.exit()
@@ -147,7 +146,7 @@ if __name__ == "__main__":
     # Do not use this until the dataloader is updated, current dataloader blows up the memory.
     if torch.cuda.device_count() > 1:
         print("Let's use ", torch.cuda.device_count(), " GPUs!")
-        net = torch.nn.DataParallel(net)
+        net = torch.nn.DataParallel(net, device_ids=list(range(torch.cuda.device_count())))
     # We use SGD
     optimizer = torch.optim.Adam(net.parameters(), lr, weight_decay=weight_decay)
 
