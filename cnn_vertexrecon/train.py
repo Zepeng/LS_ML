@@ -163,9 +163,9 @@ if __name__ == "__main__":
         net.load_state_dict(checkpoint['net'])
         best_acc = checkpoint['acc']
         start_epoch = checkpoint['epoch'] + 1
-    y_train_loss = np.zeros(100)
-    y_train_acc = np.zeros(100)
-    test_score = []
+    y_train_loss = np.array([])
+    y_train_acc = np.array([])
+    test_score = np.array([])
     start_time = time.time()
     for epoch in range(start_epoch, start_epoch + 20):
         epoch_start = time.time()
@@ -184,8 +184,8 @@ if __name__ == "__main__":
                 traceback.print_exc(e)
                 break
             print("Epoch [%d] train aveloss=%.3f aveacc=%.3f"%(epoch,train_ave_loss,train_ave_acc))
-            y_train_loss[epoch] = train_ave_loss
-            y_train_acc[epoch]  = train_ave_acc
+            np.append(y_train_loss, train_ave_loss)
+            np.append(y_train_acc, train_ave_acc)
 
             # evaluate on validationset
             try:
@@ -197,7 +197,7 @@ if __name__ == "__main__":
                 traceback.print_exc(e)
                 break
             print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,prec1,valid_loss))
-            test_score.append(score)
+            np.append(test_score, score)
         epoch_elapse = time.time() - epoch_start
         print('Epoch %d used %f seconds' % (epoch, epoch_elapse))
         print(y_train_loss, y_train_acc)
