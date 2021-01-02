@@ -11,11 +11,9 @@ def h5merger(filedir, csvfile, outfile):
     fieldnames = ['groupname', 'dsetname']
     writer = csv.DictWriter(csvfile, fieldnames)
     with h5py.File(outfile, 'w') as fid:
-        for i in range(10):
+        for i in range(len(filelist)):
             import os, time
             print(os.stat(filelist[i]).st_ctime - time.time())
-            if os.stat(filelist[i]).st_ctime - time.time() > -10:
-                continue
             fileName = filelist[i]
             print(fileName)
             f = h5py.File(fileName,  "r")
