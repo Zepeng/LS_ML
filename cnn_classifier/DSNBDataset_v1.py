@@ -45,7 +45,7 @@ class PMTIDMap():
     def CalcBin(self, pmtid):
         if pmtid > self.maxpmtid:
             print('Wrong PMT ID')
-            return (0, 0)
+            return (-1, 0)
         (pmtid, x, y, z, theta, phi) = self.pmtmap[str(pmtid)]
         ybin = np.where(self.thetas == theta)[0]
         xbin = np.where(self.thetaphi_dict[str(theta)] == phi)[0] + 112 - int(len(self.thetaphi_dict[str(theta)])/2)
@@ -93,13 +93,14 @@ def uptohdf(mapfile, infile, outfile='', eventtype=0):
     f.attrs[u'h5py_version']     = six.u(h5py.version.version)
     junodata = f.create_group(u'juno_data')
     for entry in range(df.numentries):
-        print(entry)
-        event2dimg = np.zeros((2, 225, 126), dtype=np.float16)
+        event2dimg = np.zeros((2, 225, len(pmtmap.thetas)), dtype=np.float16)
         for j in range(len(pmtids[entry])):
             (xbin, ybin) = pmtmap.CalcBin(pmtids[entry][j])
+            if xbin == -1:
+                continue
             event2dimg[0, xbin, ybin] += npes[entry][j]
             event2dimg[1, xbin, ybin] += hittime[entry][j]
-        dset = junodata.create_dataset(os.path.basename(outfile) + str(entry), data=event2dimg, dtype='float16')
+        dset = junodata.create_dataset(os.path.basename(outfile).replace('h5',str(entry)), data=event2dimg, dtype='f2')
         dset.attrs[u'tag'] = eventtype
         dset.attrs[u'vertex'] = [Xs[entry], Ys[entry], Zs[entry]]
         dset.attrs[u'eqen'] = eqen[entry]
