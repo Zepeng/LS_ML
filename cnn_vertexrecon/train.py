@@ -66,7 +66,6 @@ def train(trainloader, epoch):
         train_loss += loss.item()
         train_acc += acc
         total += targets.size(0)
-        print(outputs.shape, targets.shape, targets.size(0))
         print(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                 % (train_loss/(batch_idx+1), 100.*train_acc/total, train_acc, total))
     return train_loss/len(trainloader), 100.*train_acc/total
