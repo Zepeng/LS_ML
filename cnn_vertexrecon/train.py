@@ -59,9 +59,6 @@ def train(trainloader, epoch):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = net(inputs)
-        if torch.isnan(outputs).any():
-            import sys
-            sys.exit()
         loss = mean_square_loss(outputs, targets)
         acc = dist_acc(outputs, targets)
         loss.backward()
@@ -69,6 +66,7 @@ def train(trainloader, epoch):
         train_loss += loss.item()
         train_acc += acc
         total += targets.size(0)
+        print(outputs.shape, targets.shape, targets.size(0))
         print(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                 % (train_loss/(batch_idx+1), 100.*train_acc/total, train_acc, total))
     return train_loss/len(trainloader), 100.*train_acc/total
@@ -102,10 +100,10 @@ def test(testloader, epoch):
                     'acc': acc,
                     'epoch': epoch,
                     }
-            if not os.path.isdir('checkpoint_sens' ):
-                os.mkdir('checkpoint_sens' )
-            torch.save(state, './checkpoint_sens/ckpt_%d.t7' % epoch)
-            torch.save(state, './checkpoint_sens/ckpt.t7' )
+            if not os.path.isdir('checkpoint' ):
+                os.mkdir('checkpoint' )
+            torch.save(state, './checkpoint/ckpt_%d.t7' % epoch)
+            torch.save(state, './checkpoint/ckpt.t7' )
             best_acc = acc
         return test_loss/len(testloader), 100.*test_acc/total, score
 
@@ -149,25 +147,25 @@ if __name__ == "__main__":
     # We use SGD
     optimizer = torch.optim.Adam(net.parameters(), args.lr, weight_decay=weight_decay)
 
-    if args.resume and os.path.exists('./checkpoint_sens/ckpt.t7'):
+    if args.resume and os.path.exists('./checkpoint/ckpt.t7'):
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
-        assert os.path.isdir('checkpoint_sens'), 'Error: no checkpoint directory found!'
+        assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
         if device == 'cuda':
-            checkpoint = torch.load('./checkpoint_sens/ckpt.t7' )
+            checkpoint = torch.load('./checkpoint/ckpt.t7' )
         else:
-            checkpoint = torch.load('./checkpoint_sens/ckpt.t7', map_location=torch.device('cpu') )
+            checkpoint = torch.load('./checkpoint/ckpt.t7', map_location=torch.device('cpu') )
         net.load_state_dict(checkpoint['net'])
         best_acc = checkpoint['acc']
         start_epoch = checkpoint['epoch'] + 1
     y_train_loss = np.array([])
     y_train_acc = np.array([])
-    test_score = np.array([])
+    test_score = []
     start_time = time.time()
     for epoch in range(start_epoch, start_epoch + 20):
         epoch_start = time.time()
         # set the learning rate
-        adjust_learning_rate(optimizer, epoch, lr)
+        adjust_learning_rate(optimizer, epoch, args.lr)
         iterout = "Epoch [%d]: "%(epoch)
         for param_group in optimizer.param_groups:
             iterout += "lr=%.3e"%(param_group['lr'])
@@ -194,7 +192,7 @@ if __name__ == "__main__":
                 traceback.print_exc(e)
                 break
             print("Test[%d]:Result* Prec@1 %.3f\tLoss %.3f"%(epoch,prec1,valid_loss))
-            np.append(test_score, score)
+            test_score.append(score)
         epoch_elapse = time.time() - epoch_start
         print('Epoch %d used %f seconds' % (epoch, epoch_elapse))
         print(y_train_loss, y_train_acc)
