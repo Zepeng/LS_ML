@@ -78,10 +78,10 @@ def test(testloader, epoch):
                     'acc': acc,
                     'epoch': epoch,
                     }
-            if not os.path.isdir('checkpoint_sens' ):
-                os.mkdir('checkpoint_sens' )
-            torch.save(state, './checkpoint_sens/ckpt_%d.t7' % epoch)
-            torch.save(state, './checkpoint_sens/ckpt.t7' )
+            if not os.path.isdir('checkpoint' ):
+                os.mkdir('checkpoint' )
+            torch.save(state, './checkpoint/ckpt_%d.t7' % epoch)
+            torch.save(state, './checkpoint/ckpt.t7' )
             best_acc = acc
         return test_loss/len(testloader), 100.*correct/total, score
 
@@ -128,14 +128,14 @@ if __name__ == "__main__":
     # We use SGD
     optimizer = torch.optim.SGD(net.parameters(), args.lr, momentum=momentum, weight_decay=weight_decay)
 
-    if args.resume and os.path.exists('./checkpoint_sens/ckpt.t7'):
+    if args.resume and os.path.exists('./checkpoint/ckpt.t7'):
         # Load checkpoint.
         print('==> Resuming from checkpoint..')
-        assert os.path.isdir('checkpoint_sens'), 'Error: no checkpoint directory found!'
+        assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
         if device == 'cuda':
-            checkpoint = torch.load('./checkpoint_sens/ckpt.t7' )
+            checkpoint = torch.load('./checkpoint/ckpt.t7' )
         else:
-            checkpoint = torch.load('./checkpoint_sens/ckpt.t7', map_location=torch.device('cpu') )
+            checkpoint = torch.load('./checkpoint/ckpt.t7', map_location=torch.device('cpu') )
         net.load_state_dict(checkpoint['net'])
         best_acc = checkpoint['acc']
         start_epoch = checkpoint['epoch'] + 1
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     for epoch in range(start_epoch, start_epoch + 20):
         epoch_start = time.time()
         # set the learning rate
-        adjust_learning_rate(optimizer, epoch, lr)
+        adjust_learning_rate(optimizer, epoch, args.lr)
         iterout = "Epoch [%d]: "%(epoch)
         for param_group in optimizer.param_groups:
             iterout += "lr=%.3e"%(param_group['lr'])

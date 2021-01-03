@@ -360,4 +360,5 @@ def test():
     x = torch.rand(10, 2, 225, 125)
     print(x.dtype)
     print(net(x))
-#test()
+if __name__ == '__main__':
+    test()
