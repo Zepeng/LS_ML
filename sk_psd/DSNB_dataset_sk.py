@@ -3,6 +3,7 @@ import ROOT
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
+import tqdm
 def GenFilesList(dir_data:str, n_start_sig, n_start_bkg, step ):
     if dir_data[-1] != "/":
         dir_data += "/"
@@ -18,9 +19,12 @@ def GenFilesList(dir_data:str, n_start_sig, n_start_bkg, step ):
 def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
     bins_hist = range(-down_time, up_time, binwidth)
     max_index_hist = -10
-    data_save = []
-    n_tail = 220
-    for i in range(tchain.GetEntries()):
+    n_beforePeak = 20
+    data_save = np.zeros((tchain.GetEntries(), 2, 420), dtype=np.float32)
+    v_equen = []
+    v_vertex = []
+    n_tail = 400
+    for i in tqdm.tqdm(range(tchain.GetEntries())):
     # for i in range(1,10):
         # plt.figure(name_type+str(i))
         tchain.GetEntry(i)
@@ -28,20 +32,26 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
         npes = tchain.Charge
         hittime = tchain.Time
         eqen = tchain.Eqen
+        x = tchain.X
+        y = tchain.Y
+        z = tchain.Z
+        v_equen.append(eqen)
+        v_vertex.append([x, y, z])
         hist, bin_edges = np.histogram(hittime, bins=bins_hist )
         hist_weightE, bin_edges_weightE = np.histogram(hittime, bins=bins_hist, weights=npes)
         if max_index_hist == -10:
             max_index_hist = hist.argmax()
         hist = hist/hist.max()
         hist_weightE = hist_weightE/hist_weightE.max()
-        data_save.append(np.array([hist[max_index_hist: max_index_hist+n_tail], hist_weightE[max_index_hist: max_index_hist+n_tail]]))
-        hist = hist_weightE[max_index_hist: max_index_hist+n_tail]
-        bin_edges = bin_edges_weightE[max_index_hist: max_index_hist+n_tail]
+        data_save[i] = np.array([hist[max_index_hist-n_beforePeak: max_index_hist+n_tail], hist_weightE[max_index_hist-n_beforePeak: max_index_hist+n_tail]])
+        # data_save.append(np.array([hist[max_index_hist-n_beforePeak: max_index_hist+n_tail], hist_weightE[max_index_hist-n_beforePeak: max_index_hist+n_tail]]))
         if plot_result:
+            hist = hist_weightE[max_index_hist - n_beforePeak: max_index_hist + n_tail]
+            bin_edges = bin_edges_weightE[max_index_hist - n_beforePeak: max_index_hist + n_tail]
             for j_time in range(len(hist)):
                 h2d.Fill(bin_edges[j_time], hist[j_time])
         # plt.plot(hist, label=name_type+str(i))
-    return np.array(data_save)
+    return (np.array(data_save), np.array(v_equen), np.array(v_vertex))
 def GetProfile(h2d:ROOT.TH2D):
     h_profile = h2d.ProfileX()
     v_profile = []
@@ -91,9 +101,11 @@ if __name__ == "__main__":
 
     print(f"sig_entries : {sigchain.GetEntries()},  bkg_entries : { bkgchain.GetEntries()}")
     # bkgchain.Add('%s/*root' % bkg_dir)
-    data_save_sig = LoadData(sigchain, "sig", h2d_time_sig)
-    data_save_bkg = LoadData(bkgchain, "bkg", h2d_time_bkg)
-    np.savez(arg.outfile, sig=data_save_sig, bkg=data_save_bkg )
+    (data_save_sig, v_equen_sig, v_vertex_sig) = LoadData(sigchain, "sig", h2d_time_sig)
+    (data_save_bkg, v_equen_bkg, v_vertex_bkg) = LoadData(bkgchain, "bkg", h2d_time_bkg)
+    # print(f"shape:   (data_save_sig:{data_save_sig.shape}), (v_equen_sig:{v_equen_sig}), (v_vertex_sig:{v_vertex_sig})")
+    np.savez(arg.outfile, sig=data_save_sig, bkg=data_save_bkg, sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg )
+
     if plot_result:
         print(f"sig_data: {data_save_sig.shape},\n bkg_data: {data_save_bkg.shape}")
         h2d_time_bkg.SetStats(False)
