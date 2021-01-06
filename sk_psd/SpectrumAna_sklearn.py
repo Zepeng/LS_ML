@@ -46,8 +46,23 @@ class SpectrumAna():
                 self.input_test.append(dataset[i][0])
                 self.target_test.append(dataset[i][1])
 
-    def loadDSNB(self, datafile: str, i_scheme=0):
-        dataset = np.load(datafile, allow_pickle=True)
+    def LoadFileListIntoDataset(self, filelist:list):
+        if len(filelist) == 0:
+            print("ERROR!!! Input filelist length is zero !!! in function 'LoadFileListIntoDataset()'")
+        dataset = np.load(filelist[0], allow_pickle=True)
+        dataset_return = {}
+        for key in dataset.files:
+            dataset_return[key] = dataset[key]
+            for file in filelist[1:]:
+                dataset_tmp = np.load(file, allow_pickle=True)
+                dataset_return[key] = np.concatenate((dataset_return[key], dataset_tmp[key]))
+        print(f"Check shapes of dataset : ")
+        for key in dataset.files:
+            print(f"{key} -> {dataset_return[key].shape}")
+        return dataset_return
+    def loadDSNB(self, datafileslist, i_scheme=0):
+        # dataset = np.load(datafile, allow_pickle=True)
+        dataset = self.LoadFileListIntoDataset(datafileslist)
         data_sig_NoweightE = dataset["sig"][:, 0]
         data_bkg_NoweightE = dataset["bkg"][:, 0]
         data_sig_weightE = dataset["sig"][:, 1]
@@ -57,13 +72,21 @@ class SpectrumAna():
         data_sig_equen = dataset["sig_equen"]
         data_bkg_equen = dataset["bkg_equen"]
 
+
+
         (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE) = \
             self.VertexCut(data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
                            data_bkg_NoweightE, i_scheme)
         # data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE, data_sig_vertex/10000, data_sig_equen.reshape(len(data_sig_equen), 1)),axis=1)
         # data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE, data_bkg_vertex/10000, data_bkg_equen.reshape(len(data_bkg_equen), 1)),axis=1)
+
+        ###################combine two scheme######################################
         data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE), axis=1)
         data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE), axis=1)
+        ###########################################################################
+
+        # data_sig = data_sig_NoweightE
+        # data_bkg = data_bkg_NoweightE
 
         print(f"len(data_sig):{len(data_sig)}, len(data_bkg):{len(data_bkg)}")
         label_sig = np.ones(len(data_sig), dtype=np.int)
@@ -225,8 +248,9 @@ class SpectrumAna():
         #################################################
         return (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE)
 
-    def LoadValidateData(self, name_file, i_scheme=0):
-        dataset = np.load(name_file, allow_pickle=True)
+    def LoadValidateData(self, datafileslist, i_scheme=0):
+        # dataset = np.load(name_file, allow_pickle=True)
+        dataset = self.LoadFileListIntoDataset(datafileslist)
         # data_sig = dataset["sig"][:, 1]
         # data_bkg = dataset["bkg"][:, 1]
         data_sig_NoweightE = dataset["sig"][:, 0]
@@ -244,6 +268,10 @@ class SpectrumAna():
 
         data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE), axis=1)
         data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE), axis=1)
+
+        # data_sig = data_sig_NoweightE
+        # data_bkg = data_bkg_NoweightE
+
         # data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE, data_sig_vertex/10000, data_sig_equen.reshape((len(data_sig_equen), 1))),axis=1)
         # data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE, data_bkg_vertex/10000, data_bkg_equen.reshape((len(data_bkg_equen), 1))),axis=1)
 
@@ -320,9 +348,9 @@ class SpectrumAna():
             else:
                 tag_1.append(predict_proba[i][1])
         fig1, ax1 = plt.subplots()
-        n0, bins0, patches0 = ax1.hist(tag_0, bins=np.linspace(0, 1, 300), color='red', histtype='step',
+        n0, bins0, patches0 = ax1.hist(tag_0, bins=np.linspace(0, 1, 600), color='red', histtype='step',
                                        label='Background')
-        n1, bins1, patches1 = ax1.hist(tag_1, bins=np.linspace(0, 1, 300), color='blue', histtype='step',
+        n1, bins1, patches1 = ax1.hist(tag_1, bins=np.linspace(0, 1, 600), color='blue', histtype='step',
                                        label='Signal')
         ax1.set_xlim(0, 1)
         plt.semilogy()
@@ -332,11 +360,13 @@ class SpectrumAna():
 
         eff_bkg = []
         eff_sig = []
-        print(f"n0: {n0}, \n n1: {n1}")
+        # print(f"n0: {n0}, \n n1: {n1}")
         for i in range(len(n0)):
             eff_bkg.append(np.sum(n0[i:]) * 1.0 / np.sum(n0))
             eff_sig.append(np.sum(n1[i:]) * 1.0 / np.sum(n1))
-        fig2, ax2 = plt.subplots()
+        # fig2, ax2 = plt.subplots()
+        fig2 = plt.figure("Sig eff. VS Bkg eff.")
+        ax2=fig2.add_subplot(111)
         ax2.plot(eff_bkg, eff_sig, label=name_scheme)
         (certain_eff_bkg, eff_sig_return) = self.GetSigEff(v_eff_bkg=eff_bkg, v_eff_sig=eff_sig)
         ax2.scatter(certain_eff_bkg, eff_sig_return, s=10, marker=(5, 1), label=name_scheme)
@@ -351,20 +381,38 @@ class SpectrumAna():
 
 
 if __name__ == '__main__':
+    import glob
+    filelist_total = list(glob.glob("./jobs_DSNB_sk_data/data/*.npz"))
+    ratio_split = 0.1
+    # filelist_train = filelist_total[:int((1-0.1)*len(filelist_total))]
+    # filelist_validate = filelist_total[int((1-0.1)*len(filelist_total)):]
+    filelist_train = filelist_total[:30]
+    filelist_validate = filelist_total[50:]
+    print(f"filelist_train : {filelist_train}")
+    print(f"filelist_validate : {filelist_validate}")
     ana = SpectrumAna('FakeTest')
     v_eff_sig = {}
+    filelist = ["test_fulltime_step10.npz", "test_fulltime_step5.npz"]
     v_eff_condition = {0:"R^3<4096", 1:"R^3<1000", 2:"1000<=R^3<2000", 3:"2000<=R^3<3000", 4:"3000<=R^3<4096"}
     for i in range(5):
+    # for i in [4]:
+        print(f"#################processing {i} scheme##################")
         name_file_model = f"model_maxtime_{i}.pkl"
         # ana.loadDSNB("./try.npz")
-        # ana.loadDSNB("./traindata_maxtime.npz", i_scheme=i)
+        # ana.loadDSNB(filelist_train, i_scheme=i)
         # ana.AddModels()
-        # ana.CompareModels()
+        # # # ana.CompareModels()
         # ana.TrainModel('MLPClassifier', pkl_filename=name_file_model)
 
-        # name_file_model = "pickle_model.pkl"
-        ana.LoadValidateData("test_fulltime_step10.npz", i_scheme=i)
-        # ana.LoadModelPredict(name_file_model)
+        ana.LoadValidateData(filelist_validate, i_scheme=i)
         v_eff_sig[v_eff_condition[i]] = ana.LoadModelGetEfficiency(name_file_model, v_eff_condition[i])
     print(f"Under Background eff. = 0.01, Signal eff.:{v_eff_sig}")
+    average_eff = 0
+    for key in v_eff_sig.keys():
+        if key == 'R^3<4096':
+            continue
+        average_eff += v_eff_sig[key]
+    average_eff /= (len(v_eff_sig.keys())-1)
+    print(f"Average Signal eff. : {average_eff}")
     plt.show()
+
