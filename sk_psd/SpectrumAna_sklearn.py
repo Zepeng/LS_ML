@@ -88,7 +88,10 @@ class SpectrumAna():
         # data_sig = data_sig_NoweightE
         # data_bkg = data_bkg_NoweightE
 
-        print(f"len(data_sig):{len(data_sig)}, len(data_bkg):{len(data_bkg)}")
+        print(f"len(data_sig) Before align length:{len(data_sig)}, len(data_bkg):{len(data_bkg)}")
+        len_input = np.min([len(data_sig), len(data_bkg)])
+        data_sig, data_bkg = data_sig[:len_input], data_bkg[:len_input]
+        print(f"len(data_sig) After align length:{len(data_sig)}, len(data_bkg):{len(data_bkg)}")
         label_sig = np.ones(len(data_sig), dtype=np.int)
         label_bkg = np.zeros(len(data_bkg), dtype=np.int)
         data_return = np.vstack((data_sig, data_bkg))
@@ -458,36 +461,37 @@ if __name__ == '__main__':
     ratio_split = 0.1
     # filelist_train = filelist_total[:int((1-0.1)*len(filelist_total))]
     # filelist_validate = filelist_total[int((1-0.1)*len(filelist_total)):]
-    filelist_train = filelist_total[:50]
-    filelist_validate = filelist_total[50:]
+    filelist_train = filelist_total[:40]
+    filelist_validate = filelist_total[40:]
     print(f"filelist_train : {filelist_train}")
     print(f"filelist_validate : {filelist_validate}")
     ana = SpectrumAna('FakeTest')
     v_eff_sig = {}
     filelist = ["test_fulltime_step10.npz", "test_fulltime_step5.npz"]
-    v_eff_condition = {0:"R^3<4096", 1:"R^3<1000", 2:"1000<=R^3<2000", 3:"2000<=R^3<3000", 4:"3000<=R^3<4096"}
+    v_eff_condition = {0:"$R^3$<4096", 1:"$R^3$<1000", 2:"1000<=$R^3$<2000", 3:"2000<=$R^3$<3000", 4:"3000<=$R^3$<4096"}
     Equen_cut = True
     for i in range(5):
     # for i in [0]:
         print(f"#################processing {i} scheme##################")
         name_file_model = f"model_maxtime_{i}.pkl"
-        # ana.loadDSNB("./try.npz")
-        ana.loadDSNB(filelist_train, i_scheme=i)
-        ana.AddModels()
-        ana.CompareModels()
-        ana.TrainModel('MLPClassifier', pkl_filename=name_file_model)
+        # # ana.loadDSNB("./try.npz")
+        # ana.loadDSNB(filelist_train, i_scheme=i)
+        # ana.AddModels()
+        # # ana.CompareModels()
+        # ana.TrainModel('MLPClassifier', pkl_filename=name_file_model)
+        # # ana.TrainModel('RandomForest', pkl_filename=name_file_model)
 
-    #     ana.LoadValidateData(filelist_validate, i_scheme=i)
-    #     # ana.StudyEasyClassifybkg(name_file_model, i_scheme=i)
-    # ######################Validate model#################################################
-    #     v_eff_sig[v_eff_condition[i]] = ana.LoadModelGetEfficiency(name_file_model, v_eff_condition[i])
-    # print(f"Under Background eff. = 0.01, Signal eff.:{v_eff_sig}")
-    # average_eff = 0
-    # for key in v_eff_sig.keys():
-    #     if key == 'R^3<4096':
-    #         continue
-    #     average_eff += v_eff_sig[key]
-    # average_eff /= (len(v_eff_sig.keys())-1)
-    # print(f"Average Signal eff. : {average_eff}")
-    # plt.show()
+        ana.LoadValidateData(filelist_validate, i_scheme=i)
+        # ana.StudyEasyClassifybkg(name_file_model, i_scheme=i)
+    ######################Validate model#################################################
+        v_eff_sig[v_eff_condition[i]] = ana.LoadModelGetEfficiency(name_file_model, v_eff_condition[i])
+    print(f"Under Background eff. = 0.01, Signal eff.:{v_eff_sig}")
+    average_eff = 0
+    for key in v_eff_sig.keys():
+        if key == '$R^3$<4096':
+            continue
+        average_eff += v_eff_sig[key]
+    average_eff /= (len(v_eff_sig.keys())-1)
+    print(f"Average Signal eff. : {average_eff}")
+    plt.show()
 
