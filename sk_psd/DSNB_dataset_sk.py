@@ -11,7 +11,7 @@ def GenFilesList(dir_data:str, n_start_sig, n_start_bkg, step ):
     filelist_bkg = []
     for i_sig in range(n_start_sig, n_start_sig+step):
         filelist_sig.append(dir_data+"DSNB/data/dsnb_"+str(i_sig).zfill(6)+".root")
-    for i_bkg in range(n_start_bkg, n_start_bkg+step*3):
+    for i_bkg in range(n_start_bkg, n_start_bkg+(step+1)*3-1):
         filelist_bkg.append(dir_data+"AtmNu/data/atm_"+str(i_bkg).zfill(6)+".root")
     print("Filelist :", filelist_bkg, filelist_sig)
     return (filelist_sig, filelist_bkg)
@@ -25,7 +25,11 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
     data_save = []
     v_equen = []
     v_vertex = []
-    n_tail = 400
+    v_pdg = []
+    v_px = []
+    v_py = []
+    v_pz = []
+    is_bkg = (name_type=="bkg")
     # for i in tqdm.tqdm(range(tchain.GetEntries())):
     for i in range(tchain.GetEntries()):
     # for i in range(1,20):
@@ -41,6 +45,15 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
         x = tchain.X
         y = tchain.Y
         z = tchain.Z
+        if is_bkg:
+            pdg = tchain.initpdg
+            px  = tchain.initpx
+            py  = tchain.initpy
+            pz  = tchain.initpz
+            v_pdg.append(pdg)
+            v_px.append(px)
+            v_py.append(py)
+            v_pz.append(pz)
         v_equen.append(eqen)
         v_vertex.append([x, y, z])
         hist, bin_edges = np.histogram(hittime, bins=bins_hist )
@@ -64,7 +77,10 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
                 h2d.Fill(bin_edges[j_time], hist[j_time])
         # plt.plot(hist, label=name_type+str(i))
     # plt.legend()
-    return (np.array(data_save), np.array(v_equen), np.array(v_vertex))
+    if is_bkg:
+        return (np.array(data_save), np.array(v_equen), np.array(v_vertex), np.array(v_pdg), np.array(v_px), np.array(v_py), np.array(v_pz))
+    else:
+        return (np.array(data_save), np.array(v_equen), np.array(v_vertex))
 def GetProfile(h2d:ROOT.TH2D):
     h_profile = h2d.ProfileX()
     v_profile = []
@@ -93,7 +109,7 @@ if __name__ == "__main__":
     parser.add_argument("--inputdir", "-d", type=str, default="/workfs/exo/zepengli94/JUNO_DSNB", help="Raw data directory")
     parser.add_argument("--nstart_sig", "-ss", type=int, default=1, help="start num of signal file")
     parser.add_argument("--nstart_bkg", "-sb", type=int, default=1, help="start num of bkg file")
-    parser.add_argument("--step", "-s", type=int, default=10, help="how many signal files to put into one output")
+    parser.add_argument("--step", "-s", type=int, default=5, help="how many signal files to put into one output")
     parser.add_argument("--outfile", "-o", type=str, default="try.npz", help="name of outfile")
     arg = parser.parse_args()
     (filelist_sig, filelist_bkg) = GenFilesList(arg.inputdir, arg.nstart_sig, arg.nstart_bkg, arg.step)
@@ -115,10 +131,11 @@ if __name__ == "__main__":
     print(f"sig_entries : {sigchain.GetEntries()},  bkg_entries : { bkgchain.GetEntries()}")
     # bkgchain.Add('%s/*root' % bkg_dir)
     (data_save_sig, v_equen_sig, v_vertex_sig) = LoadData(sigchain, "sig", h2d_time_sig)
-    (data_save_bkg, v_equen_bkg, v_vertex_bkg) = LoadData(bkgchain, "bkg", h2d_time_bkg)
+    (data_save_bkg, v_equen_bkg, v_vertex_bkg, v_pdg_bkg, v_px_bkg, v_py_bkg, v_pz_bkg) = LoadData(bkgchain, "bkg", h2d_time_bkg)
     # print(f"shape:   (data_save_sig:{data_save_sig.shape}), (v_equen_sig:{v_equen_sig}), (v_vertex_sig:{v_vertex_sig})")
-    # np.savez(arg.outfile, sig=data_save_sig, bkg=data_save_bkg, sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg )
-
+    print(f"check pdg:{v_pdg_bkg.shape}, p:{v_px_bkg.shape, v_py_bkg.shape, v_pz_bkg.shape}")
+    np.savez(arg.outfile, sig=data_save_sig, bkg=data_save_bkg, sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg,
+             bkg_pdg=v_pdg_bkg, bkg_px=v_px_bkg, bkg_py=v_py_bkg, bkg_pz=v_pz_bkg)
     if plot_result:
         # print(f"sig_data: {data_save_sig.shape},\n bkg_data: {data_save_bkg.shape}")
         h2d_time_bkg.SetStats(False)
