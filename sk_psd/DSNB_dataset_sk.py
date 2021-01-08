@@ -12,7 +12,8 @@ def GenFilesList(dir_data:str, n_start_sig, n_start_bkg, step ):
     for i_sig in range(n_start_sig, n_start_sig+step):
         filelist_sig.append(dir_data+"DSNB/data/dsnb_"+str(i_sig).zfill(6)+".root")
     for i_bkg in range(n_start_bkg, n_start_bkg+(step+1)*3-1):
-        filelist_bkg.append(dir_data+"AtmNu/data/atm_"+str(i_bkg).zfill(6)+".root")
+        # filelist_bkg.append(dir_data+"AtmNu/data/atm_"+str(i_bkg).zfill(6)+".root")
+        filelist_bkg.append("/dybfs/users/chengj/data/PSD/AtmNC/Model-G/data/atm_" + str(i_bkg).zfill(6) + ".root")
     print("Filelist :", filelist_bkg, filelist_sig)
     return (filelist_sig, filelist_bkg)
 
@@ -46,10 +47,10 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
         y = tchain.Y
         z = tchain.Z
         if is_bkg:
-            pdg = tchain.initpdg
-            px  = tchain.initpx
-            py  = tchain.initpy
-            pz  = tchain.initpz
+            pdg = np.array(tchain.initpdg)
+            px  = np.array(tchain.initpx)
+            py  = np.array(tchain.initpy)
+            pz  = np.array(tchain.initpz)
             v_pdg.append(pdg)
             v_px.append(px)
             v_py.append(py)
@@ -77,8 +78,9 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
                 h2d.Fill(bin_edges[j_time], hist[j_time])
         # plt.plot(hist, label=name_type+str(i))
     # plt.legend()
+    print(f"check shape ---> pdg:{len(v_pdg)}, px:{len(v_px)}, py:{len(v_py)}, pz: {len(v_pz)} ")
     if is_bkg:
-        return (np.array(data_save), np.array(v_equen), np.array(v_vertex), np.array(v_pdg), np.array(v_px), np.array(v_py), np.array(v_pz))
+        return (np.array(data_save), np.array(v_equen), np.array(v_vertex), v_pdg, v_px, v_py, v_pz)
     else:
         return (np.array(data_save), np.array(v_equen), np.array(v_vertex))
 def GetProfile(h2d:ROOT.TH2D):
@@ -95,12 +97,33 @@ def PlotTimeProfile(h2d_sig:ROOT.TH2D, h2d_bkg:ROOT.TH2D):
     plt.plot(v_profile_sig, label="signal")
     plt.xlabel("Time [ ns ]")
     return fig_profile_time
-
+def TestnpzOuput(name_infile:str):
+    dataset = np.load(name_infile, allow_pickle=True)
+    data_sig_NoweightE = dataset["sig"][:, 0]
+    data_bkg_NoweightE = dataset["bkg"][:, 0]
+    data_sig_weightE = dataset["sig"][:, 1]
+    data_bkg_weightE = dataset["bkg"][:, 1]
+    data_sig_vertex = dataset["sig_vertex"]
+    data_bkg_vertex = dataset["bkg_vertex"]
+    data_sig_equen = dataset["sig_equen"]
+    data_bkg_equen = dataset["bkg_equen"]
+    data_bkg_pdg = dataset["bkg_pdg"]
+    data_bkg_px = dataset["bkg_px"]
+    data_bkg_py = dataset["bkg_py"]
+    data_bkg_pz = dataset["bkg_pz"]
+    print("######################Check Saved npz data#######################")
+    print(f"pdg length: {data_bkg_pdg.shape}")
+    print(f"p shape-> px:{data_bkg_px.shape}, py:{data_bkg_py.shape}, pz:{data_bkg_pz.shape}")
+    print(f"pdg: {data_bkg_pdg[:10]}")
+    print(f"px: {data_bkg_px[:10]}")
+    print(f"py: {data_bkg_py[:10]}")
+    print(f"pz: {data_bkg_pz[:10]}")
 if __name__ == "__main__":
     up_time = 1000
     down_time = 200
     binwidth = 10
     plot_result = False
+    test_savefile = False
     n_bins = (up_time+down_time)/binwidth
     h2d_time_sig = ROOT.TH2D("h_time_sig", "h_time_sig", int(n_bins), -down_time, up_time, int(n_bins), 0, 1.1)
     h2d_time_bkg = ROOT.TH2D("h_time_bkg", "h_time_bkg", int(n_bins), -down_time, up_time, int(n_bins), 0, 1.1)
@@ -113,6 +136,10 @@ if __name__ == "__main__":
     parser.add_argument("--outfile", "-o", type=str, default="try.npz", help="name of outfile")
     arg = parser.parse_args()
     (filelist_sig, filelist_bkg) = GenFilesList(arg.inputdir, arg.nstart_sig, arg.nstart_bkg, arg.step)
+
+    if test_savefile:
+        TestnpzOuput(arg.outfile)
+        exit()
 
     # name_sig_files = "/workfs/exo/zepengli94/JUNO_DSNB/DSNB/data/dsnb_00000[1-9].root"
     # name_bkg_files_1 = "/workfs/exo/zepengli94/JUNO_DSNB/AtmNu/data/atm_00000[1-9].root"
@@ -133,9 +160,10 @@ if __name__ == "__main__":
     (data_save_sig, v_equen_sig, v_vertex_sig) = LoadData(sigchain, "sig", h2d_time_sig)
     (data_save_bkg, v_equen_bkg, v_vertex_bkg, v_pdg_bkg, v_px_bkg, v_py_bkg, v_pz_bkg) = LoadData(bkgchain, "bkg", h2d_time_bkg)
     # print(f"shape:   (data_save_sig:{data_save_sig.shape}), (v_equen_sig:{v_equen_sig}), (v_vertex_sig:{v_vertex_sig})")
-    print(f"check pdg:{v_pdg_bkg.shape}, p:{v_px_bkg.shape, v_py_bkg.shape, v_pz_bkg.shape}")
+    print(f"check pdg:{len(v_pdg_bkg)}, p:{len(v_px_bkg), len(v_py_bkg), len(v_pz_bkg)}")
+    print(v_pdg_bkg, v_px_bkg)
     np.savez(arg.outfile, sig=data_save_sig, bkg=data_save_bkg, sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg,
-             bkg_pdg=v_pdg_bkg, bkg_px=v_px_bkg, bkg_py=v_py_bkg, bkg_pz=v_pz_bkg)
+             bkg_pdg=np.array(v_pdg_bkg), bkg_px=np.array(v_px_bkg), bkg_py=np.array(v_py_bkg), bkg_pz=np.array(v_pz_bkg))
     if plot_result:
         # print(f"sig_data: {data_save_sig.shape},\n bkg_data: {data_save_bkg.shape}")
         h2d_time_bkg.SetStats(False)
