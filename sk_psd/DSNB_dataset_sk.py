@@ -18,12 +18,16 @@ def GenFilesList(dir_data:str, n_start_sig, n_start_bkg, step ):
     return (filelist_sig, filelist_bkg)
 
 def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
-    bins_hist = np.concatenate((np.array([-200]), np.arange(-50, 250, binwidth), np.linspace(250, 1000, 5)))
-    print(f"bins_hist: {bins_hist}")
+    binwidth_weightE = 5
+    binwidth = 10
+    bins_hist_weightE = np.concatenate((np.array([-200]), np.arange(-50+binwidth_weightE/2., 200+binwidth_weightE/2., binwidth_weightE), np.linspace(200+binwidth_weightE/2., 1000+binwidth_weightE/2., 5)))
+    # bins_hist_weightE = np.concatenate((np.array([-200]), np.arange(-50., 200., binwidth_weightE), np.linspace(200, 1000, 5)))
+    bins_hist = np.concatenate((np.array([-200]), np.arange(-50-binwidth/2., 200-binwidth/2., binwidth), np.linspace(200-binwidth/2., 1000-binwidth/2., 5)))
+    print(f"bins_hist: {bins_hist_weightE}")
     max_index_hist = -10
     n_beforePeak = 20
     # data_save = np.zeros((tchain.GetEntries(), 2, len(bins_hist)-1), dtype=np.float32)
-    data_save = []
+    data_save = {"NoWeightE":[], "WeightE":[]}
     v_equen = []
     v_vertex = []
     v_pdg = []
@@ -58,7 +62,7 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
         v_equen.append(eqen)
         v_vertex.append([x, y, z])
         hist, bin_edges = np.histogram(hittime, bins=bins_hist )
-        hist_weightE, bin_edges_weightE = np.histogram(hittime, bins=bins_hist, weights=npes)
+        hist_weightE, bin_edges_weightE = np.histogram(hittime, bins=bins_hist_weightE, weights=npes)
         # print(f"check entry {i}, hist of hittime : {hist_weightE}")
         if max_index_hist == -10:
             max_index_hist = hist.argmax()
@@ -67,22 +71,27 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
         # print(f"hist_weightE:  {hist_weightE}")
         # data_save[i] = np.array([hist, hist_weightE])
         # data_save.append(np.array([hist[max_index_hist-n_beforePeak: max_index_hist+n_tail], hist_weightE[max_index_hist-n_beforePeak: max_index_hist+n_tail]]))
-        data_save.append(np.array([hist, hist_weightE]))
+        # data_save.append(np.array([hist, hist_weightE]))
+        data_save["NoWeightE"].append(np.array([hist]))
+        data_save["WeightE"].append(np.array([hist_weightE]))
         # print(f"data_save: {np.array(data_save).shape}")
         if plot_result:
             # hist = hist_weightE[max_index_hist - n_beforePeak: max_index_hist + n_tail]
             # bin_edges = bin_edges_weightE[max_index_hist - n_beforePeak: max_index_hist + n_tail]
             hist = hist_weightE
             bin_edges = bin_edges_weightE
+            # hist = hist
+            # bin_edges = bin_edges
             for j_time in range(len(hist)):
                 h2d.Fill(bin_edges[j_time], hist[j_time])
-        # plt.plot(hist, label=name_type+str(i))
-    # plt.legend()
+        plt.figure(name_type+"_fig")
+        plt.plot(hist, label=name_type+str(i))
+    plt.legend()
     print(f"check shape ---> pdg:{len(v_pdg)}, px:{len(v_px)}, py:{len(v_py)}, pz: {len(v_pz)} ")
     if is_bkg:
-        return (np.array(data_save), np.array(v_equen), np.array(v_vertex), v_pdg, v_px, v_py, v_pz)
+        return (data_save, np.array(v_equen), np.array(v_vertex), v_pdg, v_px, v_py, v_pz)
     else:
-        return (np.array(data_save), np.array(v_equen), np.array(v_vertex))
+        return (data_save, np.array(v_equen), np.array(v_vertex))
 def GetProfile(h2d:ROOT.TH2D):
     h_profile = h2d.ProfileX()
     v_profile = []
@@ -99,10 +108,12 @@ def PlotTimeProfile(h2d_sig:ROOT.TH2D, h2d_bkg:ROOT.TH2D):
     return fig_profile_time
 def TestnpzOuput(name_infile:str):
     dataset = np.load(name_infile, allow_pickle=True)
-    data_sig_NoweightE = dataset["sig"][:, 0]
-    data_bkg_NoweightE = dataset["bkg"][:, 0]
-    data_sig_weightE = dataset["sig"][:, 1]
-    data_bkg_weightE = dataset["bkg"][:, 1]
+    dataset_sig = dataset["sig"].item()
+    dataset_bkg = dataset["bkg"].item()
+    data_sig_NoweightE = dataset_sig["NoWeightE"]
+    data_bkg_NoweightE = dataset_bkg["NoWeightE"]
+    data_sig_weightE = dataset_sig["WeightE"]
+    data_bkg_weightE = dataset_bkg["WeightE"]
     data_sig_vertex = dataset["sig_vertex"]
     data_bkg_vertex = dataset["bkg_vertex"]
     data_sig_equen = dataset["sig_equen"]
