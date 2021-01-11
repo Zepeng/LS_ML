@@ -84,9 +84,9 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
             # bin_edges = bin_edges
             for j_time in range(len(hist)):
                 h2d.Fill(bin_edges[j_time], hist[j_time])
-        plt.figure(name_type+"_fig")
-        plt.plot(hist, label=name_type+str(i))
-    plt.legend()
+    #     plt.figure(name_type+"_fig")
+    #     plt.plot(hist, label=name_type+str(i))
+    # plt.legend()
     print(f"check shape ---> pdg:{len(v_pdg)}, px:{len(v_px)}, py:{len(v_py)}, pz: {len(v_pz)} ")
     if is_bkg:
         return (data_save, np.array(v_equen), np.array(v_vertex), v_pdg, v_px, v_py, v_pz)
