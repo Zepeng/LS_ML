@@ -10,6 +10,7 @@ from scipy.special import softmax
 import random
 import load_calib
 import load_egamma
+import pandas as pd
 
 
 class SpectrumAna():
@@ -51,11 +52,18 @@ class SpectrumAna():
             print("ERROR!!! Input filelist length is zero !!! in function 'LoadFileListIntoDataset()'")
         dataset = np.load(filelist[0], allow_pickle=True)
         dataset_return = {}
+        print(f"key : {dataset.files}")
         for key in dataset.files:
             dataset_return[key] = dataset[key]
-            for file in filelist[1:]:
-                dataset_tmp = np.load(file, allow_pickle=True)
-                dataset_return[key] = np.concatenate((dataset_return[key], dataset_tmp[key]))
+        for file in filelist[1:]:
+            dataset_tmp = np.load(file, allow_pickle=True)
+            def inner(dataset_tmp):
+                for key in dataset.files:
+                    if len(dataset_tmp[key]) == 0:
+                        return
+                for key in dataset.files:
+                    dataset_return[key] = np.concatenate((dataset_return[key], dataset_tmp[key]))
+            inner(dataset_tmp)
         print(f"Check shapes of dataset : ")
         for key in dataset.files:
             print(f"{key} -> {dataset_return[key].shape}")
@@ -67,16 +75,28 @@ class SpectrumAna():
         data_bkg_NoweightE = dataset["bkg"][:, 0]
         data_sig_weightE = dataset["sig"][:, 1]
         data_bkg_weightE = dataset["bkg"][:, 1]
+        # dataset_sig = dataset["sig"].item()
+        # dataset_bkg = dataset["bkg"].item()
+        # data_sig_NoweightE = dataset_sig["NoWeightE"]
+        # data_bkg_NoweightE = dataset_bkg["NoWeightE"]
+        # data_sig_weightE = dataset_sig["WeightE"]
+        # data_bkg_weightE = dataset_bkg["WeightE"]
         data_sig_vertex = dataset["sig_vertex"]
         data_bkg_vertex = dataset["bkg_vertex"]
         data_sig_equen = dataset["sig_equen"]
         data_bkg_equen = dataset["bkg_equen"]
+        data_bkg_pdg = dataset["bkg_pdg"]
+        data_bkg_px = dataset["bkg_px"]
+        data_bkg_py = dataset["bkg_py"]
+        data_bkg_pz = dataset["bkg_pz"]
 
-
-
-        (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE, data_sig_Equen, data_bkg_Equen, data_sig_vertex, data_bkg_vertex) = \
+        (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE, data_sig_equen,
+         data_bkg_equen, data_sig_vertex, data_bkg_vertex, data_bkg_pdg,
+                data_bkg_px, data_bkg_py, data_bkg_pz ) = \
             self.VertexCut(data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
-                           data_bkg_NoweightE, data_sig_equen, data_bkg_equen, i_scheme)
+                           data_bkg_NoweightE, data_sig_equen, data_bkg_equen, data_bkg_pdg, data_bkg_px,
+                           data_bkg_py, data_bkg_pz, i_scheme)
+
         # data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE, data_sig_vertex/10000, data_sig_equen.reshape(len(data_sig_equen), 1)),axis=1)
         # data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE, data_bkg_vertex/10000, data_bkg_equen.reshape(len(data_bkg_equen), 1)),axis=1)
 
@@ -220,7 +240,8 @@ class SpectrumAna():
                 print(classifier.predict(input_test[:100]), target_test[:100])
 
     def VertexCut(self, data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
-                  data_bkg_NoweightE, data_sig_Equen, data_bkg_Equen, i_scheme=0):
+                  data_bkg_NoweightE, data_sig_Equen, data_bkg_Equen, data_bkg_pdg, data_bkg_px,
+                  data_bkg_py, data_bkg_pz, i_scheme=0):
         ####make a vertex cut for dataset###############
         data_sig_R = np.sqrt(np.sum(data_sig_vertex ** 2, axis=1)) / 1000
         data_bkg_R = np.sqrt(np.sum(data_bkg_vertex ** 2, axis=1)) / 1000
@@ -255,10 +276,18 @@ class SpectrumAna():
         data_bkg_weightE, data_bkg_NoweightE = data_bkg_weightE[cut_indices_bkg], data_bkg_NoweightE[cut_indices_bkg]
         data_sig_Equen, data_bkg_Equen = data_sig_Equen[cut_indices_sig], data_bkg_Equen[cut_indices_bkg]
         data_sig_vertex, data_bkg_vertex = data_sig_vertex[cut_indices_sig], data_bkg_vertex[cut_indices_bkg]
+
+        if study_pdg:
+            data_bkg_pdg = data_bkg_pdg[cut_indices_bkg]
+            data_bkg_px, data_bkg_py, data_bkg_pz = data_bkg_px[cut_indices_bkg], data_bkg_py[cut_indices_bkg], data_bkg_pz[cut_indices_bkg]
+        else:
+            data_bkg_R = []
+            data_bkg_px, data_bkg_py, data_bkg_pz = [], [], []
         print(f"check shape input : {data_bkg_weightE.shape}")
         #################################################
         return (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE,
-                data_sig_Equen, data_bkg_Equen, data_sig_vertex, data_bkg_vertex)
+                data_sig_Equen, data_bkg_Equen, data_sig_vertex, data_bkg_vertex, data_bkg_pdg,
+                data_bkg_px, data_bkg_py, data_bkg_pz)
 
     def LoadValidateData(self, datafileslist, i_scheme=0):
         # dataset = np.load(name_file, allow_pickle=True)
@@ -274,10 +303,20 @@ class SpectrumAna():
         data_sig_equen = dataset["sig_equen"]
         data_bkg_equen = dataset["bkg_equen"]
 
+        if study_pdg:
+            data_bkg_pdg = dataset["bkg_pdg"]
+            data_bkg_px = dataset["bkg_px"]
+            data_bkg_py = dataset["bkg_py"]
+            data_bkg_pz = dataset["bkg_pz"]
+        else:
+            data_bkg_pdg, data_bkg_px, data_bkg_py, data_bkg_pz = [], [], [], []
+
         (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE, data_sig_equen,
-         data_bkg_equen, data_sig_vertex, data_bkg_vertex) = \
+         data_bkg_equen, data_sig_vertex, data_bkg_vertex, data_bkg_pdg,
+                data_bkg_px, data_bkg_py, data_bkg_pz ) = \
             self.VertexCut(data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
-                           data_bkg_NoweightE, data_sig_equen, data_bkg_equen, i_scheme)
+                           data_bkg_NoweightE, data_sig_equen, data_bkg_equen, data_bkg_pdg, data_bkg_px,
+                           data_bkg_py, data_bkg_pz, i_scheme)
 
         data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE), axis=1)
         data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE), axis=1)
@@ -298,6 +337,13 @@ class SpectrumAna():
         self.label_validate = np.concatenate((label_sig[:n_validate], label_bkg[:n_validate]))
         self.v_vertex_validate = np.concatenate((data_sig_vertex[:n_validate], data_bkg_vertex[:n_validate]))
         self.v_equen_validate = np.concatenate((data_sig_equen[:n_validate], data_bkg_equen[:n_validate]))
+
+        if study_pdg:
+            self.input_validate_bkg = data_bkg
+            self.label_validate_bkg = label_bkg
+            self.v_bkg_px, self.v_bkg_py, self.v_bkg_pz = data_bkg_px, data_bkg_py, data_bkg_pz
+            self.v_bkg_pdg_validate = data_bkg_pdg
+
         print(f"shape of data :{self.input_validate.shape}")
         print(f" labels : {self.label_validate}")
         print(f"shape of vertices :{self.v_vertex_validate.shape}")
@@ -396,7 +442,7 @@ class SpectrumAna():
         plt.legend()
         fig2.savefig('roc.png')
         return float(eff_sig_return)
-    def StudyEasyClassifybkg(self, name_file_model, i_scheme=0 ):
+    def StudyEasyClassifybkg_R3andE(self, name_file_model, i_scheme=0 ):
         with open(name_file_model, 'rb') as fr:
             classifier = pickle.load(fr)
         predict_proba = classifier.predict_proba(self.input_validate)
@@ -424,6 +470,7 @@ class SpectrumAna():
 
         easy_criterion = 0.2
         hard_criterion = 0.5
+        # if study_pdg:
 
         fig1 = plt.figure(f"Train scheme {i_scheme} ---R3")
         ax1 = fig1.add_subplot(111)
@@ -455,9 +502,124 @@ class SpectrumAna():
         plt.legend()
         plt.show()
 
+    def StudyEasyClassifybkg_pdg(self, name_file_model, i_scheme=0 ):
+        with open(name_file_model, 'rb') as fr:
+            classifier = pickle.load(fr)
+
+        predict_proba = classifier.predict_proba(self.input_validate_bkg)
+        tag_0 = []
+        for i in range(len(predict_proba)):
+            tag_0.append(predict_proba[i][1])
+        easy_criterion = 0.001
+        hard_criterion = 0.5
+        tag_0 = np.array(tag_0)
+        index_easy = (np.array(tag_0)< easy_criterion)
+        index_hard = (np.array(tag_0)> hard_criterion)
+        pdg_easy = self.v_bkg_pdg_validate[index_easy]
+        pdg_hard = self.v_bkg_pdg_validate[index_hard]
+
+        generalize_dict_easy = {"nu_\mu":[], "nu_e":[], "p":[], "n":[], "N":[]}
+        generalize_dict_hard = {"nu_\mu":[], "nu_e":[], "p":[], "n":[], "N":[]}
+
+        def PutEvtIntoDict(generalize_dict:dict, event):
+            evt_counter = Counter(event)
+            generalize_dict["nu_e"].append(evt_counter[12]+evt_counter[-12])
+            generalize_dict["nu_\mu"].append(evt_counter[14]+evt_counter[-14])
+            generalize_dict["p"].append(evt_counter[2212])
+            generalize_dict["n"].append(evt_counter[2112])
+            generalize_dict["N"].append(0)
+            for key in evt_counter.keys():
+                if key > 1000000000:
+                    generalize_dict["N"][-1] += evt_counter[key]
+            return generalize_dict
+
+        list_pdg_easy = []
+        list_pdg_hard = []
+        v_n_neutrons_oneevt_easy = []
+        v_n_neutrons_oneevt_hard = []
+        from collections import Counter
+        for event in pdg_hard:
+            list_pdg_hard.append(list(np.sort(event)))
+            generalize_dict_hard = PutEvtIntoDict(generalize_dict_hard, event)
+        for event in pdg_easy:
+            list_pdg_easy.append(list(np.sort(event)))
+            generalize_dict_easy  = PutEvtIntoDict(generalize_dict_easy, event)
+
+        keys = list(generalize_dict_easy.keys())
+
+        def ReformDict(dict_data:dict, keys):
+            data_return = np.array(dict_data[keys[0]])[np.newaxis].T
+            data_return_str = []
+            for key in keys[1:]:
+                data_return = np.concatenate((data_return, np.array(dict_data[key])[np.newaxis].T), axis=1)
+            for arr in data_return:
+                data_return_str.append("".join(list(np.array(arr, dtype=str))))
+            return data_return_str
+
+        generalize_array_easy = ReformDict(generalize_dict_easy, keys)
+        generalize_array_hard = ReformDict(generalize_dict_hard, keys)
+        generalize_counter_easy = Counter(generalize_array_easy)
+        generalize_counter_hard = Counter(generalize_array_hard)
+        print(f"Sig. Pro. < {easy_criterion} : ",generalize_counter_easy,"\n")
+        print(f"Sig. Pro. > {hard_criterion} : ",generalize_counter_hard)
+        df_easy = pd.DataFrame.from_dict(generalize_counter_easy, orient="index", columns=[f"Signal Probability < {easy_criterion}"])
+        df_hard = pd.DataFrame.from_dict(generalize_counter_hard, orient="index", columns=[f"Signal Probability > {hard_criterion}"])
+        df_plot = pd.concat([df_easy, df_hard], axis=1 )
+        df_plot.sort_index(inplace=True, ascending=False)
+
+        #### Normalize df_plot##########
+        for i in list(df_plot.columns):
+           # 获取各个指标的最大值和最小值
+            Max = np.max(df_plot[i])
+            df_plot[i] = df_plot[i]/Max
+
+        df_plot.plot.barh()
+        #### generate title ###########
+        title_plot = f"${v_eff_condition[i_scheme].replace('$', '')}("
+        for key in keys:
+            if "nu" in key:
+                title_plot += "\\"
+            title_plot += key+":"
+        title_plot = title_plot[:-1]+ "$)"
+        ###############################
+        plt.title(title_plot)
+        plt.xlabel("Normalized Num. of Evts")
+        plt.ylabel("Tag")
+        # plt.show()
+
+        #####################################################using 3D scatter to analyze pdg######################################################################################
+        # keys = list(generalize_dict_easy.keys())
+        # fig = plt.figure("visualize pdg")
+        # ax = fig.add_subplot(111, projection="3d")
+        # img1= ax.scatter(generalize_dict_easy[keys[0]], generalize_dict_easy[keys[1]], generalize_dict_easy[keys[2]], c=generalize_dict_easy[keys[3]], cmap=plt.hot(), s=3, marker=".")
+        # img2= ax.scatter(generalize_dict_hard[keys[0]], generalize_dict_hard[keys[1]], generalize_dict_hard[keys[2]], c=generalize_dict_hard[keys[3]], cmap=plt.hot(), s=3, marker="^")
+        # fig.colorbar(img1)
+        # plt.show()
+        #############################################################################################################################################################################
+
+        # print(f"generalized evts dict(easy) : {generalize_dict_easy['n'][:10]}")
+        # print(f"generalized evts dict(hard) : {generalize_dict_hard['n'][:10]}")
+        # print(f"pdg_easy : {list_pdg_easy[:50]}")
+        # print("\n")
+        # print(f"pdg_hard : {list_pdg_hard[:20]}")
+
+        #########################################plt the signal probability distribution of bkg############################################################################################
+        # fig3 = plt.figure("easy VS hard")
+        # ax3 = fig3.add_subplot(111)
+        # n0, bins0, patches0 = ax3.hist(tag_0[index_easy], bins=np.linspace(0, 1, 600), color='red', histtype='step',
+        #                                label=f'bkg(Sig. Pro. < {easy_criterion}')
+        # n1, bins1, patches1 = ax3.hist(tag_0[index_hard], bins=np.linspace(0, 1, 600), color='blue', histtype='step',
+        #                                label=f'bkg(Sig. Pro. > {hard_criterion}')
+        # ax3.set_xlim(0, 1)
+        # plt.semilogy()
+        # ax3.legend()
+        # ax3.set_xlabel('Prediction output')
+        # plt.show()
+        ###############################################################################################################################################################################
+
 if __name__ == '__main__':
     import glob
-    filelist_total = list(glob.glob("./jobs_DSNB_sk_data/data/*.npz"))
+    filelist_total = list(glob.glob("./jobs_DSNB_sk_data/data_withpdg/*.npz"))
     ratio_split = 0.1
     # filelist_train = filelist_total[:int((1-0.1)*len(filelist_total))]
     # filelist_validate = filelist_total[int((1-0.1)*len(filelist_total)):]
@@ -469,29 +631,31 @@ if __name__ == '__main__':
     v_eff_sig = {}
     filelist = ["test_fulltime_step10.npz", "test_fulltime_step5.npz"]
     v_eff_condition = {0:"$R^3$<4096", 1:"$R^3$<1000", 2:"1000<=$R^3$<2000", 3:"2000<=$R^3$<3000", 4:"3000<=$R^3$<4096"}
+    study_pdg = False
     Equen_cut = True
     for i in range(5):
     # for i in [0]:
         print(f"#################processing {i} scheme##################")
-        name_file_model = f"model_maxtime_{i}.pkl"
+        name_file_model = f"./model_maxtime_rebinning/model_maxtime_{i}.pkl"
         # # ana.loadDSNB("./try.npz")
-        # ana.loadDSNB(filelist_train, i_scheme=i)
-        # ana.AddModels()
-        # # ana.CompareModels()
-        # ana.TrainModel('MLPClassifier', pkl_filename=name_file_model)
-        # # ana.TrainModel('RandomForest', pkl_filename=name_file_model)
+        ana.loadDSNB(filelist_train, i_scheme=i)
+        ana.AddModels()
+        # ana.CompareModels()
+        ana.TrainModel('MLPClassifier', pkl_filename=name_file_model)
+        # ana.TrainModel('RandomForest', pkl_filename=name_file_model)
 
-        ana.LoadValidateData(filelist_validate, i_scheme=i)
-        # ana.StudyEasyClassifybkg(name_file_model, i_scheme=i)
-    ######################Validate model#################################################
-        v_eff_sig[v_eff_condition[i]] = ana.LoadModelGetEfficiency(name_file_model, v_eff_condition[i])
-    print(f"Under Background eff. = 0.01, Signal eff.:{v_eff_sig}")
-    average_eff = 0
-    for key in v_eff_sig.keys():
-        if key == '$R^3$<4096':
-            continue
-        average_eff += v_eff_sig[key]
-    average_eff /= (len(v_eff_sig.keys())-1)
-    print(f"Average Signal eff. : {average_eff}")
-    plt.show()
+        # ana.LoadValidateData(filelist_validate, i_scheme=i)
+        # # ana.StudyEasyClassifybkg_R3andE(name_file_model, i_scheme=i)
+        # ana.StudyEasyClassifybkg_pdg(name_file_model, i_scheme=i)
+    # ######################Validate model#################################################
+    #     v_eff_sig[v_eff_condition[i]] = ana.LoadModelGetEfficiency(name_file_model, v_eff_condition[i])
+    # print(f"Under Background eff. = 0.01, Signal eff.:{v_eff_sig}")
+    # average_eff = 0
+    # for key in v_eff_sig.keys():
+    #     if key == '$R^3$<4096':
+    #         continue
+    #     average_eff += v_eff_sig[key]
+    # average_eff /= (len(v_eff_sig.keys())-1)
+    # print(f"Average Signal eff. : {average_eff}")
+    # plt.show()
 
