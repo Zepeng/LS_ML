@@ -1,9 +1,9 @@
 import warnings
+from pickle import dump,load
 
 import matplotlib.pyplot as plt
 from sklearn.exceptions import ConvergenceWarning
 import numpy as np
-
 import pickle, sys
 import uproot as up
 from scipy.special import softmax
@@ -11,6 +11,58 @@ import random
 import load_calib
 import load_egamma
 import pandas as pd
+from sklearn import preprocessing
+
+
+def VertexCut(data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
+              data_bkg_NoweightE, data_sig_Equen, data_bkg_Equen, data_bkg_pdg, data_bkg_px,
+              data_bkg_py, data_bkg_pz, i_scheme=0):
+    ####make a vertex cut for dataset###############
+    data_sig_R = np.sqrt(np.sum(data_sig_vertex ** 2, axis=1)) / 1000
+    data_bkg_R = np.sqrt(np.sum(data_bkg_vertex ** 2, axis=1)) / 1000
+    # print(f"shape of data_sig_R : {data_sig_R.shape}, shape of data_sig_vertex: {data_sig_vertex.shape}")
+
+    if i_scheme == 0:
+        cut_indices_sig = (data_sig_R ** 3 < 4096)
+        cut_indices_bkg = (data_bkg_R ** 3 < 4096)
+    elif i_scheme == 1:
+        cut_indices_sig = (data_sig_R ** 3 < 1000)
+        cut_indices_bkg = (data_bkg_R ** 3 < 1000)
+    elif i_scheme == 2:
+        cut_indices_sig = ((data_sig_R ** 3 >= 1000) & (data_sig_R ** 3 < 2000))
+        cut_indices_bkg = ((data_bkg_R ** 3 >= 1000) & (data_bkg_R ** 3 < 2000))
+    elif i_scheme == 3:
+        cut_indices_sig = (data_sig_R ** 3 >= 2000) & (data_sig_R ** 3 < 3000)
+        cut_indices_bkg = (data_bkg_R ** 3 >= 2000) & (data_bkg_R ** 3 < 3000)
+    elif i_scheme == 4:
+        cut_indices_sig = (data_sig_R ** 3 >= 3000) & (data_sig_R ** 3 < 4096)
+        cut_indices_bkg = (data_bkg_R ** 3 >= 3000) & (data_bkg_R ** 3 < 4096)
+    else:
+        print("Wrong i_scheme input!!!!")
+        exit(1)
+
+    if Equen_cut:
+        Ecut_indices_sig = ((data_sig_Equen<31) & (data_sig_Equen>10))
+        Ecut_indices_bkg = ((data_bkg_Equen<31) & (data_bkg_Equen>10))
+        cut_indices_sig = (cut_indices_sig & Ecut_indices_sig)
+        cut_indices_bkg = (cut_indices_bkg & Ecut_indices_bkg)
+
+    data_sig_weightE, data_sig_NoweightE = data_sig_weightE[cut_indices_sig], data_sig_NoweightE[cut_indices_sig]
+    data_bkg_weightE, data_bkg_NoweightE = data_bkg_weightE[cut_indices_bkg], data_bkg_NoweightE[cut_indices_bkg]
+    data_sig_Equen, data_bkg_Equen = data_sig_Equen[cut_indices_sig], data_bkg_Equen[cut_indices_bkg]
+    data_sig_vertex, data_bkg_vertex = data_sig_vertex[cut_indices_sig], data_bkg_vertex[cut_indices_bkg]
+
+    if study_pdg:
+        data_bkg_pdg = data_bkg_pdg[cut_indices_bkg]
+        data_bkg_px, data_bkg_py, data_bkg_pz = data_bkg_px[cut_indices_bkg], data_bkg_py[cut_indices_bkg], data_bkg_pz[cut_indices_bkg]
+    else:
+        data_bkg_R = []
+        data_bkg_px, data_bkg_py, data_bkg_pz = [], [], []
+    print(f"check shape input : {data_bkg_weightE.shape}")
+    #################################################
+    return (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE,
+            data_sig_Equen, data_bkg_Equen, data_sig_vertex, data_bkg_vertex, data_bkg_pdg,
+            data_bkg_px, data_bkg_py, data_bkg_pz)
 
 
 class SpectrumAna():
@@ -30,7 +82,6 @@ class SpectrumAna():
             print('The task is not supported by this module!')
             sys.exit()
         self.TaskType = task
-
     # load the fake data for test
     def loadfakedata(self, datafile):
         dataset = np.load(datafile, allow_pickle=True)
@@ -71,16 +122,28 @@ class SpectrumAna():
     def loadDSNB(self, datafileslist, i_scheme=0):
         # dataset = np.load(datafile, allow_pickle=True)
         dataset = self.LoadFileListIntoDataset(datafileslist)
-        data_sig_NoweightE = dataset["sig"][:, 0]
-        data_bkg_NoweightE = dataset["bkg"][:, 0]
-        data_sig_weightE = dataset["sig"][:, 1]
-        data_bkg_weightE = dataset["bkg"][:, 1]
-        # dataset_sig = dataset["sig"].item()
-        # dataset_bkg = dataset["bkg"].item()
-        # data_sig_NoweightE = dataset_sig["NoWeightE"]
-        # data_bkg_NoweightE = dataset_bkg["NoWeightE"]
-        # data_sig_weightE = dataset_sig["WeightE"]
-        # data_bkg_weightE = dataset_bkg["WeightE"]
+        if version_npz == 1:
+            ##################### version 1 npz reading method #################################
+            data_sig_NoweightE = dataset["sig"][:, 0]
+            data_bkg_NoweightE = dataset["bkg"][:, 0]
+            data_sig_weightE = dataset["sig"][:, 1]
+            data_bkg_weightE = dataset["bkg"][:, 1]
+            #####################################################################################
+        elif version_npz == 2:
+            #################### version 2 npz reading method ##################################
+            dataset_sig = dataset["sig"].item()
+            dataset_bkg = dataset["bkg"].item()
+            data_sig_NoweightE = dataset_sig["NoWeightE"]
+            data_bkg_NoweightE = dataset_bkg["NoWeightE"]
+            data_sig_weightE = dataset_sig["WeightE"]
+            data_bkg_weightE = dataset_bkg["WeightE"]
+            #####################################################################################
+        elif version_npz == 3:
+            data_sig_NoweightE = dataset["sig_NoWeightE"][:, 0]
+            data_bkg_NoweightE = dataset["bkg_NoWeightE"][:, 0]
+            data_sig_weightE = dataset["sig_WeightE"][:, 0]
+            data_bkg_weightE = dataset["bkg_WeightE"][:, 0]
+
         data_sig_vertex = dataset["sig_vertex"]
         data_bkg_vertex = dataset["bkg_vertex"]
         data_sig_equen = dataset["sig_equen"]
@@ -93,7 +156,7 @@ class SpectrumAna():
         (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE, data_sig_equen,
          data_bkg_equen, data_sig_vertex, data_bkg_vertex, data_bkg_pdg,
                 data_bkg_px, data_bkg_py, data_bkg_pz ) = \
-            self.VertexCut(data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
+            VertexCut(data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
                            data_bkg_NoweightE, data_sig_equen, data_bkg_equen, data_bkg_pdg, data_bkg_px,
                            data_bkg_py, data_bkg_pz, i_scheme)
 
@@ -101,17 +164,24 @@ class SpectrumAna():
         # data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE, data_bkg_vertex/10000, data_bkg_equen.reshape(len(data_bkg_equen), 1)),axis=1)
 
         ###################combine two scheme######################################
-        data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE), axis=1)
-        data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE), axis=1)
+        # data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE), axis=1)
+        # data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE), axis=1)
         ###########################################################################
-
-        # data_sig = data_sig_NoweightE
-        # data_bkg = data_bkg_NoweightE
+        if input_data_type == "Combine":
+            data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE), axis=1)
+            data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE), axis=1)
+        elif input_data_type == "NoWeightE":
+            data_sig = data_sig_NoweightE
+            data_bkg = data_bkg_NoweightE
+        elif input_data_type == "WeightE":
+            data_sig = data_sig_weightE
+            data_bkg = data_bkg_weightE
 
         print(f"len(data_sig) Before align length:{len(data_sig)}, len(data_bkg):{len(data_bkg)}")
         len_input = np.min([len(data_sig), len(data_bkg)])
         data_sig, data_bkg = data_sig[:len_input], data_bkg[:len_input]
         print(f"len(data_sig) After align length:{len(data_sig)}, len(data_bkg):{len(data_bkg)}")
+
         label_sig = np.ones(len(data_sig), dtype=np.int)
         label_bkg = np.zeros(len(data_bkg), dtype=np.int)
         data_return = np.vstack((data_sig, data_bkg))
@@ -122,11 +192,11 @@ class SpectrumAna():
             print("There existing a Error cause length of labels and data don't match !!!!!")
             exit(1)
 
+        self.input_test = []
+        self.input_train = []
+        self.target_test = []
+        self.target_train = []
         # shuffle the signal and background events by indices
-        input_train = []
-        target_train = []
-        input_test = []
-        target_test = []
         indices = np.arange(len(data_return))
         random.shuffle(indices)
         # split the dataset into two parts for training and testing respectively.
@@ -137,7 +207,21 @@ class SpectrumAna():
             else:
                 self.input_test.append(data_return[index])
                 self.target_test.append(label_return[index])
-        # return (data_return, label_return)
+
+        if normalized_input:
+            if not UseOneScalar or i_scheme==0:
+                scalar = preprocessing.StandardScaler().fit(self.input_train)
+                self.input_train = scalar.transform(self.input_train)
+                self.input_test = scalar.transform(self.input_test)
+                dump(scalar, open(f"{dir_model}scaler_{i_scheme}.pkl", "wb"))
+            elif UseOneScalar and i_scheme!=0:
+                scalar = load(open(f'{dir_model}scaler_0.pkl', 'rb'))
+                self.input_train = scalar.transform(self.input_train)
+                self.input_test = scalar.transform(self.input_test)
+            else:
+                print("There exit a bug! This condition should not be satisfied!")
+                print(f"i_scheme:{i_scheme}")
+                exit(1)
 
     # load the dataset for gamma/neutron separation from calibration
     def loadcalib(self, neutronfile, gammafile):
@@ -179,6 +263,7 @@ class SpectrumAna():
             else:
                 self.input_test.append(events[index][0])
                 self.target_test.append(events[index][1])
+
 
     def AddModels(self):
         # Add multiple models for comparison, look for the definition\
@@ -239,65 +324,32 @@ class SpectrumAna():
                 print(predict_proba.shape)
                 print(classifier.predict(input_test[:100]), target_test[:100])
 
-    def VertexCut(self, data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
-                  data_bkg_NoweightE, data_sig_Equen, data_bkg_Equen, data_bkg_pdg, data_bkg_px,
-                  data_bkg_py, data_bkg_pz, i_scheme=0):
-        ####make a vertex cut for dataset###############
-        data_sig_R = np.sqrt(np.sum(data_sig_vertex ** 2, axis=1)) / 1000
-        data_bkg_R = np.sqrt(np.sum(data_bkg_vertex ** 2, axis=1)) / 1000
-        # print(f"shape of data_sig_R : {data_sig_R.shape}, shape of data_sig_vertex: {data_sig_vertex.shape}")
-
-        if (i_scheme == 0):
-            cut_indices_sig = (data_sig_R ** 3 < 4096)
-            cut_indices_bkg = (data_bkg_R ** 3 < 4096)
-        elif (i_scheme == 1):
-            cut_indices_sig = (data_sig_R ** 3 < 1000)
-            cut_indices_bkg = (data_bkg_R ** 3 < 1000)
-        elif (i_scheme == 2):
-            cut_indices_sig = ((data_sig_R ** 3 >= 1000) & (data_sig_R ** 3 < 2000))
-            cut_indices_bkg = ((data_bkg_R ** 3 >= 1000) & (data_bkg_R ** 3 < 2000))
-        elif (i_scheme == 3):
-            cut_indices_sig = (data_sig_R ** 3 >= 2000) & (data_sig_R ** 3 < 3000)
-            cut_indices_bkg = (data_bkg_R ** 3 >= 2000) & (data_bkg_R ** 3 < 3000)
-        elif (i_scheme == 4):
-            cut_indices_sig = (data_sig_R ** 3 >= 3000) & (data_sig_R ** 3 < 4096)
-            cut_indices_bkg = (data_bkg_R ** 3 >= 3000) & (data_bkg_R ** 3 < 4096)
-        else:
-            print("Wrong i_scheme input!!!!")
-            exit(1)
-
-        if Equen_cut == True:
-            Ecut_indices_sig = ((data_sig_Equen<31) & (data_sig_Equen>10))
-            Ecut_indices_bkg = ((data_bkg_Equen<31) & (data_bkg_Equen>10))
-            cut_indices_sig = (cut_indices_sig & Ecut_indices_sig)
-            cut_indices_bkg = (cut_indices_bkg & Ecut_indices_bkg)
-
-        data_sig_weightE, data_sig_NoweightE = data_sig_weightE[cut_indices_sig], data_sig_NoweightE[cut_indices_sig]
-        data_bkg_weightE, data_bkg_NoweightE = data_bkg_weightE[cut_indices_bkg], data_bkg_NoweightE[cut_indices_bkg]
-        data_sig_Equen, data_bkg_Equen = data_sig_Equen[cut_indices_sig], data_bkg_Equen[cut_indices_bkg]
-        data_sig_vertex, data_bkg_vertex = data_sig_vertex[cut_indices_sig], data_bkg_vertex[cut_indices_bkg]
-
-        if study_pdg:
-            data_bkg_pdg = data_bkg_pdg[cut_indices_bkg]
-            data_bkg_px, data_bkg_py, data_bkg_pz = data_bkg_px[cut_indices_bkg], data_bkg_py[cut_indices_bkg], data_bkg_pz[cut_indices_bkg]
-        else:
-            data_bkg_R = []
-            data_bkg_px, data_bkg_py, data_bkg_pz = [], [], []
-        print(f"check shape input : {data_bkg_weightE.shape}")
-        #################################################
-        return (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE,
-                data_sig_Equen, data_bkg_Equen, data_sig_vertex, data_bkg_vertex, data_bkg_pdg,
-                data_bkg_px, data_bkg_py, data_bkg_pz)
-
     def LoadValidateData(self, datafileslist, i_scheme=0):
         # dataset = np.load(name_file, allow_pickle=True)
         dataset = self.LoadFileListIntoDataset(datafileslist)
-        # data_sig = dataset["sig"][:, 1]
-        # data_bkg = dataset["bkg"][:, 1]
-        data_sig_NoweightE = dataset["sig"][:, 0]
-        data_bkg_NoweightE = dataset["bkg"][:, 0]
-        data_sig_weightE = dataset["sig"][:, 1]
-        data_bkg_weightE = dataset["bkg"][:, 1]
+
+        if version_npz == 1:
+            ##################### version 1 npz reading method #################################
+            data_sig_NoweightE = dataset["sig"][:, 0]
+            data_bkg_NoweightE = dataset["bkg"][:, 0]
+            data_sig_weightE = dataset["sig"][:, 1]
+            data_bkg_weightE = dataset["bkg"][:, 1]
+            #####################################################################################
+        elif version_npz == 2:
+            #################### version 2 npz reading method ##################################
+            dataset_sig = dataset["sig"].item()
+            dataset_bkg = dataset["bkg"].item()
+            data_sig_NoweightE = dataset_sig["NoWeightE"]
+            data_bkg_NoweightE = dataset_bkg["NoWeightE"]
+            data_sig_weightE = dataset_sig["WeightE"]
+            data_bkg_weightE = dataset_bkg["WeightE"]
+            #####################################################################################
+        elif version_npz == 3:
+            data_sig_NoweightE = dataset["sig_NoWeightE"][:, 0]
+            data_bkg_NoweightE = dataset["bkg_NoWeightE"][:, 0]
+            data_sig_weightE = dataset["sig_WeightE"][:, 0]
+            data_bkg_weightE = dataset["bkg_WeightE"][:, 0]
+
         data_sig_vertex = dataset["sig_vertex"]
         data_bkg_vertex = dataset["bkg_vertex"]
         data_sig_equen = dataset["sig_equen"]
@@ -314,16 +366,18 @@ class SpectrumAna():
         (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE, data_sig_equen,
          data_bkg_equen, data_sig_vertex, data_bkg_vertex, data_bkg_pdg,
                 data_bkg_px, data_bkg_py, data_bkg_pz ) = \
-            self.VertexCut(data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
+            VertexCut(data_sig_vertex, data_bkg_vertex, data_sig_weightE, data_bkg_weightE, data_sig_NoweightE,
                            data_bkg_NoweightE, data_sig_equen, data_bkg_equen, data_bkg_pdg, data_bkg_px,
                            data_bkg_py, data_bkg_pz, i_scheme)
-
-        data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE), axis=1)
-        data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE), axis=1)
-
-        # data_sig = data_sig_NoweightE
-        # data_bkg = data_bkg_NoweightE
-
+        if input_data_type == "Combine":
+            data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE), axis=1)
+            data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE), axis=1)
+        elif input_data_type == "NoWeightE":
+            data_sig = data_sig_NoweightE
+            data_bkg = data_bkg_NoweightE
+        elif input_data_type == "WeightE":
+            data_sig = data_sig_weightE
+            data_bkg = data_bkg_weightE
         # data_sig = np.concatenate((data_sig_NoweightE, data_sig_weightE, data_sig_vertex/10000, data_sig_equen.reshape((len(data_sig_equen), 1))),axis=1)
         # data_bkg = np.concatenate((data_bkg_NoweightE, data_bkg_weightE, data_bkg_vertex/10000, data_bkg_equen.reshape((len(data_bkg_equen), 1))),axis=1)
 
@@ -337,6 +391,13 @@ class SpectrumAna():
         self.label_validate = np.concatenate((label_sig[:n_validate], label_bkg[:n_validate]))
         self.v_vertex_validate = np.concatenate((data_sig_vertex[:n_validate], data_bkg_vertex[:n_validate]))
         self.v_equen_validate = np.concatenate((data_sig_equen[:n_validate], data_bkg_equen[:n_validate]))
+        
+        if normalized_input:
+            if not UseOneScalar:
+                scaler = load(open(f'{dir_model}scaler_{i_scheme}.pkl', 'rb'))
+            else:
+                scaler = load(open(f'{dir_model}scaler_0.pkl', 'rb'))
+        self.input_validate = scaler.transform(self.input_validate)
 
         if study_pdg:
             self.input_validate_bkg = data_bkg
@@ -411,7 +472,8 @@ class SpectrumAna():
                 tag_0.append(predict_proba[i][1])
             else:
                 tag_1.append(predict_proba[i][1])
-        fig1, ax1 = plt.subplots()
+        fig1 = plt.figure(name_scheme+"fig")
+        ax1 = fig1.add_subplot(111)
         n0, bins0, patches0 = ax1.hist(tag_0, bins=np.linspace(0, 1, 600), color='red', histtype='step',
                                        label='Background')
         n1, bins1, patches1 = ax1.hist(tag_1, bins=np.linspace(0, 1, 600), color='blue', histtype='step',
@@ -440,8 +502,8 @@ class SpectrumAna():
         ax2.set_xlim(0, 0.05)
         ax2.set_ylim(0, 1)
         plt.legend()
-        fig2.savefig('roc.png')
-        return float(eff_sig_return)
+        fig2.savefig(f'{dir_model}roc_{name_scheme}.png')
+        return ( float(eff_sig_return), eff_bkg, eff_sig)
     def StudyEasyClassifybkg_R3andE(self, name_file_model, i_scheme=0 ):
         with open(name_file_model, 'rb') as fr:
             classifier = pickle.load(fr)
@@ -566,12 +628,14 @@ class SpectrumAna():
         df_hard = pd.DataFrame.from_dict(generalize_counter_hard, orient="index", columns=[f"Signal Probability > {hard_criterion}"])
         df_plot = pd.concat([df_easy, df_hard], axis=1 )
         df_plot.sort_index(inplace=True, ascending=False)
+        fig = plt.figure()
 
         #### Normalize df_plot##########
         for i in list(df_plot.columns):
            # 获取各个指标的最大值和最小值
-            Max = np.max(df_plot[i])
-            df_plot[i] = df_plot[i]/Max
+           #  Max = np.max(df_plot[i])
+            Sum = np.sum(df_plot[i])
+            df_plot[i] = df_plot[i]/Sum
 
         df_plot.plot.barh()
         #### generate title ###########
@@ -619,43 +683,78 @@ class SpectrumAna():
 
 if __name__ == '__main__':
     import glob
-    filelist_total = list(glob.glob("./jobs_DSNB_sk_data/data_withpdg/*.npz"))
+    # filelist_total = list(glob.glob("./jobs_DSNB_sk_data/data_withpdg/*.npz"))
+    filelist_total = list(glob.glob("./jobs_DSNB_sk_data/data/*.npz"))
     ratio_split = 0.1
     # filelist_train = filelist_total[:int((1-0.1)*len(filelist_total))]
     # filelist_validate = filelist_total[int((1-0.1)*len(filelist_total)):]
-    filelist_train = filelist_total[:40]
-    filelist_validate = filelist_total[40:]
+    filelist_train = filelist_total[:60]
+    filelist_validate = filelist_total[60:]
     print(f"filelist_train : {filelist_train}")
     print(f"filelist_validate : {filelist_validate}")
     ana = SpectrumAna('FakeTest')
     v_eff_sig = {}
+    eff_bkg_plot = {}
+    eff_sig_plot = {}
     filelist = ["test_fulltime_step10.npz", "test_fulltime_step5.npz"]
     v_eff_condition = {0:"$R^3$<4096", 1:"$R^3$<1000", 2:"1000<=$R^3$<2000", 3:"2000<=$R^3$<3000", 4:"3000<=$R^3$<4096"}
     study_pdg = False
     Equen_cut = True
+    normalized_input = True
+    UseOneScalar = True
+    choices_input_data_type = ["NoWeightE", "WeightE", "Combine"]
+    input_data_type:str = choices_input_data_type[1]
+    version_npz = 3
+    if input_data_type == "NoWeightE":
+        dir_model = "./model_maxtime_rebinning_time_diffscaler/"
+    elif input_data_type == "WeightE":
+        # dir_model = "./model_maxtime_rebinning_WeightEtime_diffscaler/"
+        dir_model = "./model_maxtime_rebinning_WeightEtime/"
+    elif input_data_type == "Combine":
+        # dir_model = "./model_maxtime_rebinning_2/"
+        dir_model = "./model_maxtime_rebinning_Normalized_diffscaler/"
+    else:
+        print("ERROR!!!! str input_data_type should be one of (NoWeightE, WeightE, Combine)")
+        exit(1)
+    import os
+    if not os.path.isdir(dir_model):
+        os.mkdir(dir_model)
+
     for i in range(5):
-    # for i in [0]:
+    # for i in [4]:
         print(f"#################processing {i} scheme##################")
-        name_file_model = f"./model_maxtime_rebinning/model_maxtime_{i}.pkl"
-        # # ana.loadDSNB("./try.npz")
-        ana.loadDSNB(filelist_train, i_scheme=i)
-        ana.AddModels()
-        # ana.CompareModels()
-        ana.TrainModel('MLPClassifier', pkl_filename=name_file_model)
-        # ana.TrainModel('RandomForest', pkl_filename=name_file_model)
+        name_file_model = dir_model+f"model_maxtime_{i}.pkl"
+        # ana.loadDSNB(filelist_train, i_scheme=i)
+        # ana.AddModels()
+        # # ana.CompareModels()
+        # ana.TrainModel('MLPClassifier', pkl_filename=name_file_model)
+        # # ana.TrainModel('RandomForest', pkl_filename=name_file_model)
 
-        # ana.LoadValidateData(filelist_validate, i_scheme=i)
-        # # ana.StudyEasyClassifybkg_R3andE(name_file_model, i_scheme=i)
-        # ana.StudyEasyClassifybkg_pdg(name_file_model, i_scheme=i)
-    # ######################Validate model#################################################
-    #     v_eff_sig[v_eff_condition[i]] = ana.LoadModelGetEfficiency(name_file_model, v_eff_condition[i])
-    # print(f"Under Background eff. = 0.01, Signal eff.:{v_eff_sig}")
-    # average_eff = 0
-    # for key in v_eff_sig.keys():
-    #     if key == '$R^3$<4096':
-    #         continue
-    #     average_eff += v_eff_sig[key]
-    # average_eff /= (len(v_eff_sig.keys())-1)
-    # print(f"Average Signal eff. : {average_eff}")
-    # plt.show()
-
+        ana.LoadValidateData(filelist_validate, i_scheme=i)
+        # ana.StudyEasyClassifybkg_R3andE(name_file_model, i_scheme=i)
+        if study_pdg:
+            ana.StudyEasyClassifybkg_pdg(name_file_model, i_scheme=i)
+        else:
+    ######################Validate model#################################################
+            (v_eff_sig[v_eff_condition[i]], eff_bkg_plot[v_eff_condition[i]], eff_sig_plot[v_eff_condition[i]]) =\
+                ana.LoadModelGetEfficiency(name_file_model, v_eff_condition[i])
+    if not study_pdg:
+        if input_data_type == "NoWeightE":
+            name_outfile = "eff_timeNoWeightE_input.npz"
+        elif input_data_type == "WeightE":
+            name_outfile = "eff_timeWeightE_input.npz"
+        elif input_data_type == "Combine":
+            name_outfile = "eff_timeCombine_input.npz"
+        else:
+            print("ERROR!!!! name_outfile should be one of (NoWeightE, WeightE, Combine)")
+            exit(1)
+        np.savez(name_outfile, eff_bkg=eff_bkg_plot, eff_sig=eff_sig_plot)
+        print(f"Under Background eff. = 0.01, Signal eff.:{v_eff_sig}")
+        average_eff = 0
+        for key in v_eff_sig.keys():
+            if key == '$R^3$<4096':
+                continue
+            average_eff += v_eff_sig[key]
+        average_eff /= (len(v_eff_sig.keys())-1)
+        print(f"Average Signal eff. : {average_eff}")
+    plt.show()
