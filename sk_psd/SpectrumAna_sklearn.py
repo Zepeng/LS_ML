@@ -148,10 +148,13 @@ class SpectrumAna():
         data_bkg_vertex = dataset["bkg_vertex"]
         data_sig_equen = dataset["sig_equen"]
         data_bkg_equen = dataset["bkg_equen"]
-        data_bkg_pdg = dataset["bkg_pdg"]
-        data_bkg_px = dataset["bkg_px"]
-        data_bkg_py = dataset["bkg_py"]
-        data_bkg_pz = dataset["bkg_pz"]
+        if study_pdg:
+            data_bkg_pdg = dataset["bkg_pdg"]
+            data_bkg_px = dataset["bkg_px"]
+            data_bkg_py = dataset["bkg_py"]
+            data_bkg_pz = dataset["bkg_pz"]
+        else:
+            data_bkg_pdg, data_bkg_px, data_bkg_py, data_bkg_pz = [], [], [], []
 
         (data_sig_weightE, data_sig_NoweightE, data_bkg_weightE, data_bkg_NoweightE, data_sig_equen,
          data_bkg_equen, data_sig_vertex, data_bkg_vertex, data_bkg_pdg,
@@ -190,7 +193,8 @@ class SpectrumAna():
         print(f"labels : {label_return}")
         if len(data_return) != len(label_return):
             print("There existing a Error cause length of labels and data don't match !!!!!")
-            exit(1)
+        else:
+            data_bkg_pdg, data_bkg_px, data_bkg_py, data_bkg_pz = [], [], [], []
 
         self.input_test = []
         self.input_train = []
@@ -201,7 +205,7 @@ class SpectrumAna():
         random.shuffle(indices)
         # split the dataset into two parts for training and testing respectively.
         for index in indices:
-            if len(self.input_train) < 0.8 * len(data_return):
+            if len(self.input_train) < 0.95 * len(data_return):
                 self.input_train.append(data_return[index])
                 self.target_train.append(label_return[index])
             else:
@@ -307,6 +311,12 @@ class SpectrumAna():
             print(names[i], results[i].mean())
 
     def TrainModel(self, modelname, pkl_filename='pickle_model.pkl' ):
+        if normalized_input:
+            print("Check normalized status:")
+            print(f"input_train mean(should be 0): {self.input_train.mean(axis=0)}")
+            print(f"input_train std(should be 1): {self.input_train.std(axis=0)}")
+            print(f"input_train shape : {self.input_train.shape}")
+
         # Train and save a specific model.
         if modelname not in self.models.keys():
             print('Model not supported yet!')
@@ -397,7 +407,7 @@ class SpectrumAna():
                 scaler = load(open(f'{dir_model}scaler_{i_scheme}.pkl', 'rb'))
             else:
                 scaler = load(open(f'{dir_model}scaler_0.pkl', 'rb'))
-        self.input_validate = scaler.transform(self.input_validate)
+            self.input_validate = scaler.transform(self.input_validate)
 
         if study_pdg:
             self.input_validate_bkg = data_bkg
@@ -462,6 +472,11 @@ class SpectrumAna():
         return (certain_eff_bkg, eff_sig_return)
 
     def LoadModelGetEfficiency(self, name_file_model, name_scheme=""):
+        if normalized_input:
+            print("Check normalized input_validate")
+            print(f"mean of input_validate: {self.input_validate.mean(axis=0)}")
+            print(f"std  of input_validate: {self.input_validate.std(axis=0)}")
+            print(f"shape of input_validate: {self.input_validate.shape}")
         with open(name_file_model, 'rb') as fr:
             classifier = pickle.load(fr)
         predict_proba = classifier.predict_proba(self.input_validate)
@@ -474,14 +489,15 @@ class SpectrumAna():
                 tag_1.append(predict_proba[i][1])
         fig1 = plt.figure(name_scheme+"fig")
         ax1 = fig1.add_subplot(111)
-        n0, bins0, patches0 = ax1.hist(tag_0, bins=np.linspace(0, 1, 600), color='red', histtype='step',
+        n0, bins0, patches0 = ax1.hist(tag_0, bins=np.linspace(0, 1, 1000), color='red', histtype='step',
                                        label='Background')
-        n1, bins1, patches1 = ax1.hist(tag_1, bins=np.linspace(0, 1, 600), color='blue', histtype='step',
+        n1, bins1, patches1 = ax1.hist(tag_1, bins=np.linspace(0, 1, 1000), color='blue', histtype='step',
                                        label='Signal')
         ax1.set_xlim(0, 1)
         plt.semilogy()
         ax1.legend()
         ax1.set_xlabel('Prediction output')
+        ax1.set_title(name_scheme+"(w/o charge)")
         fig1.savefig('predicts.png')
 
         eff_bkg = []
@@ -682,9 +698,15 @@ class SpectrumAna():
         ###############################################################################################################################################################################
 
 if __name__ == '__main__':
+    import argparse
     import glob
+    parser = argparse.ArgumentParser(description='DSNB sklearn classifier.')
+    parser.add_argument("--input", "-i", type=int, default=2, help="choose which input , 0: NoWeightE, 1:WeightE, 2:Combine")
+    parser.add_argument("--status", "-s", type=str, default="train", help="decide which status(train or validate)")
+    parser.add_argument("--inputdir", "-d", type=str, default="./jobs_DSNB_sk_data/data/",help="dir of raw data")
+    par = parser.parse_args()
     # filelist_total = list(glob.glob("./jobs_DSNB_sk_data/data_withpdg/*.npz"))
-    filelist_total = list(glob.glob("./jobs_DSNB_sk_data/data/*.npz"))
+    filelist_total = list(glob.glob(f"{par.inputdir}*.npz"))
     ratio_split = 0.1
     # filelist_train = filelist_total[:int((1-0.1)*len(filelist_total))]
     # filelist_validate = filelist_total[int((1-0.1)*len(filelist_total)):]
@@ -696,65 +718,73 @@ if __name__ == '__main__':
     v_eff_sig = {}
     eff_bkg_plot = {}
     eff_sig_plot = {}
-    filelist = ["test_fulltime_step10.npz", "test_fulltime_step5.npz"]
+    # filelist = ["test_fulltime_step10.npz", "test_fulltime_step5.npz"]
     v_eff_condition = {0:"$R^3$<4096", 1:"$R^3$<1000", 2:"1000<=$R^3$<2000", 3:"2000<=$R^3$<3000", 4:"3000<=$R^3$<4096"}
     study_pdg = False
     Equen_cut = True
-    normalized_input = True
-    UseOneScalar = True
+    normalized_input = False
+    UseOneScalar = False
     choices_input_data_type = ["NoWeightE", "WeightE", "Combine"]
-    input_data_type:str = choices_input_data_type[1]
+    input_data_type:str = choices_input_data_type[par.input]
     version_npz = 3
     if input_data_type == "NoWeightE":
-        dir_model = "./model_maxtime_rebinning_time_diffscaler/"
+        dir_model = "./model_maxtime_time/"
     elif input_data_type == "WeightE":
         # dir_model = "./model_maxtime_rebinning_WeightEtime_diffscaler/"
-        dir_model = "./model_maxtime_rebinning_WeightEtime/"
+        dir_model = "./model_maxtime_WeightEtime/"
     elif input_data_type == "Combine":
         # dir_model = "./model_maxtime_rebinning_2/"
-        dir_model = "./model_maxtime_rebinning_Normalized_diffscaler/"
+        dir_model = "./model_maxtime_combine/"
     else:
         print("ERROR!!!! str input_data_type should be one of (NoWeightE, WeightE, Combine)")
         exit(1)
+    if normalized_input:
+        dir_model = dir_model[:-1]+"_Normalized/"
+        if not UseOneScalar:
+            dir_model = dir_model[:-1]+"_diffscaler/"
+    dir_model = dir_model[:-1]+"_"+par.inputdir.split("/")[1]+"/"
     import os
     if not os.path.isdir(dir_model):
         os.mkdir(dir_model)
 
     for i in range(5):
-    # for i in [4]:
+    # for i in [0]:
         print(f"#################processing {i} scheme##################")
         name_file_model = dir_model+f"model_maxtime_{i}.pkl"
-        # ana.loadDSNB(filelist_train, i_scheme=i)
-        # ana.AddModels()
-        # # ana.CompareModels()
-        # ana.TrainModel('MLPClassifier', pkl_filename=name_file_model)
-        # # ana.TrainModel('RandomForest', pkl_filename=name_file_model)
+        if par.status == "train":
+            ana.loadDSNB(filelist_train, i_scheme=i)
+            ana.AddModels()
+            # ana.CompareModels()
+            ana.TrainModel('MLPClassifier', pkl_filename=name_file_model)
+            # ana.TrainModel('RandomForest', pkl_filename=name_file_model)
 
-        ana.LoadValidateData(filelist_validate, i_scheme=i)
-        # ana.StudyEasyClassifybkg_R3andE(name_file_model, i_scheme=i)
-        if study_pdg:
-            ana.StudyEasyClassifybkg_pdg(name_file_model, i_scheme=i)
-        else:
-    ######################Validate model#################################################
-            (v_eff_sig[v_eff_condition[i]], eff_bkg_plot[v_eff_condition[i]], eff_sig_plot[v_eff_condition[i]]) =\
-                ana.LoadModelGetEfficiency(name_file_model, v_eff_condition[i])
-    if not study_pdg:
-        if input_data_type == "NoWeightE":
-            name_outfile = "eff_timeNoWeightE_input.npz"
-        elif input_data_type == "WeightE":
-            name_outfile = "eff_timeWeightE_input.npz"
-        elif input_data_type == "Combine":
-            name_outfile = "eff_timeCombine_input.npz"
-        else:
-            print("ERROR!!!! name_outfile should be one of (NoWeightE, WeightE, Combine)")
-            exit(1)
-        np.savez(name_outfile, eff_bkg=eff_bkg_plot, eff_sig=eff_sig_plot)
-        print(f"Under Background eff. = 0.01, Signal eff.:{v_eff_sig}")
-        average_eff = 0
-        for key in v_eff_sig.keys():
-            if key == '$R^3$<4096':
-                continue
-            average_eff += v_eff_sig[key]
-        average_eff /= (len(v_eff_sig.keys())-1)
-        print(f"Average Signal eff. : {average_eff}")
-    plt.show()
+        elif par.status == "validate":
+            ana.LoadValidateData(filelist_validate, i_scheme=i)
+            # ana.StudyEasyClassifybkg_R3andE(name_file_model, i_scheme=i)
+            if study_pdg:
+                ana.StudyEasyClassifybkg_pdg(name_file_model, i_scheme=i)
+            else:
+    ####    ##################Validate model#################################################
+                (v_eff_sig[v_eff_condition[i]], eff_bkg_plot[v_eff_condition[i]], eff_sig_plot[v_eff_condition[i]]) =\
+                    ana.LoadModelGetEfficiency(name_file_model, v_eff_condition[i])
+    if par.status == "validate":
+        if not study_pdg:
+            if input_data_type == "NoWeightE":
+                name_outfile = "eff_timeNoWeightE_input.npz"
+            elif input_data_type == "WeightE":
+                name_outfile = "eff_timeWeightE_input.npz"
+            elif input_data_type == "Combine":
+                name_outfile = "eff_timeCombine_input.npz"
+            else:
+                print("ERROR!!!! name_outfile should be one of (NoWeightE, WeightE, Combine)")
+                exit(1)
+            np.savez(dir_model+name_outfile, eff_bkg=eff_bkg_plot, eff_sig=eff_sig_plot)
+            print(f"Under Background eff. = 0.01, Signal eff.:{v_eff_sig}")
+            average_eff = 0
+            for key in v_eff_sig.keys():
+                if key == '$R^3$<4096':
+                    continue
+                average_eff += v_eff_sig[key]
+            average_eff /= (len(v_eff_sig.keys())-1)
+            print(f"Average Signal eff. : {average_eff}")
+        plt.show()
