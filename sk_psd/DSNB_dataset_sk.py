@@ -21,10 +21,10 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
 
     ################ rebinning strategy 1 #############################
     # binwidth_weightE = 5
-    # binwidth = 10
-    # bins_hist_weightE = np.concatenate((np.array([-200]), np.arange(-50+binwidth_weightE/2., 200+binwidth_weightE/2., binwidth_weightE), np.linspace(200+binwidth_weightE/2., 1000+binwidth_weightE/2., 5)))
+    # binwidth = 5
+    # bins_hist_weightE = np.concatenate((np.array([-200]), np.arange(-50+binwidth_weightE/2., 200+binwidth_weightE/2., binwidth_weightE), np.linspace(200+binwidth_weightE/2., 1000+binwidth_weightE/2., 6)))
     # # bins_hist_weightE = np.concatenate((np.array([-200]), np.arange(-50., 200., binwidth_weightE), np.linspace(200, 1000, 5)))
-    # bins_hist = np.concatenate((np.array([-200]), np.arange(-50-binwidth/2., 200-binwidth/2., binwidth), np.linspace(200-binwidth/2., 1000-binwidth/2., 5)))
+    # bins_hist = np.concatenate((np.array([-200]), np.arange(-50+binwidth/2., 200+binwidth/2., binwidth), np.linspace(200+binwidth/2., 1000+binwidth/2., 6)))
     ###################################################################
 
     ################ rebinning strategy 2 ###################################
@@ -38,8 +38,8 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
     #     else:
     #         tail_bin_edge[i] = tail_bin_edge[i-1]+step_range[i]
     # tail_bin_edge = tail_bin_edge[tail_bin_edge<=1000]
-    # # bins_hist_weightE = np.concatenate(( np.arange(-20+binwidth_weightE/2., 20+binwidth_weightE/2., binwidth_weightE), tail_bin_edge))
-    # bins_hist_weightE = np.concatenate(( np.arange(-20., 20., binwidth_weightE), tail_bin_edge))
+    # bins_hist_weightE = np.concatenate(( np.arange(-20+binwidth_weightE/2., 20+binwidth_weightE/2., binwidth_weightE), tail_bin_edge))
+    # # bins_hist_weightE = np.concatenate(( np.arange(-20., 20., binwidth_weightE), tail_bin_edge))
     # # bins_hist_weightE = np.concatenate((np.array([-200]), np.arange(-50., 200., binwidth_weightE), np.linspace(200, 1000, 5)))
     # bins_hist = np.concatenate(( np.arange(-20+binwidth_weightE/2., 20+binwidth_weightE/2., binwidth_weightE), tail_bin_edge))
     ############################################################################
@@ -47,7 +47,7 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
     ################ rebinning strategy 3##################################
     bins_hist = [-19,-18,-17,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,66,72,80,90,102,116,132,150,170,192,216,242,270,300,332,366,402,440,480,522,566,612,660,710,762,816]
     bins_hist_weightE = [-19,-18,-17,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,66,72,80,90,102,116,132,150,170,192,216,242,270,300,332,366,402,440,480,522,566,612,660,710,762,816]
-    bins_width, bins_width_weightE = np.diff(bins_hist), np.diff(bins_hist_weightE)
+    # bins_width, bins_width_weightE = np.diff(bins_hist), np.diff(bins_hist_weightE)
 
     # bins_hist = np.arange(-20, 800)
     # bins_hist_weightE = np.arange(-20, 800)
@@ -65,7 +65,11 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
     v_pz = []
     is_bkg = (name_type=="bkg")
     # for i in tqdm.tqdm(range(tchain.GetEntries())):
-    for i in range(tchain.GetEntries()):
+    if plot_single:
+        v_iter = range(1,10)
+    else:
+        v_iter = range(tchain.GetEntries)
+    for i in v_iter:
     # for i in range(1,10):
         if i % 200==0:
             print(f"processing entry {i}")
@@ -90,18 +94,20 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
             v_pz.append(pz)
         v_equen.append(eqen)
         v_vertex.append([x, y, z])
-        hist, bin_edges = np.histogram(hittime, bins=bins_hist )
-        hist_weightE, bin_edges_weightE = np.histogram(hittime, bins=bins_hist_weightE, weights=npes)
-        hist = hist/bins_width
-        hist_weightE = hist_weightE/bins_width_weightE
-        hist/= hist[18]
-        hist_weightE /= hist_weightE[18]
+        hist, bin_edges = np.histogram(hittime, bins=bins_hist, density=True)
+        hist_weightE, bin_edges_weightE = np.histogram(hittime, bins=bins_hist_weightE, weights=npes, density=True)
+        # hist = hist/bins_width
+        # hist_weightE = hist_weightE/bins_width_weightE
+        # hist/= hist[18]
+        # hist_weightE /= hist_weightE[18]
 
+        ################### divided by max###################################
         # print(f"check entry {i}, hist of hittime : {hist_weightE}")
         # if max_index_hist == -10:
         #     max_index_hist = hist.argmax()
         # hist = hist/hist.max()
         # hist_weightE = hist_weightE/hist_weightE.max()
+        ####################################################################
 
         # print(f"hist_weightE:  {hist_weightE}")
         # data_save[i] = np.array([hist, hist_weightE])
@@ -119,10 +125,12 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
             # bin_edges = bin_edges
             for j_time in range(len(hist)):
                 h2d.Fill(bin_edges[j_time], hist[j_time])
-    #     plt.figure(name_type+"_fig")
-    #     plt.plot(bin_edges[:-1],hist, label=name_type+str(i))
-    # # plt.semilogy()
-    # plt.legend()
+        if plot_single:
+            plt.figure(name_type+"_fig")
+            plt.plot(bin_edges[:-1],hist, label=name_type+str(i))
+    # plt.semilogy()
+    if plot_single:
+        plt.legend()
     if is_bkg and save_pdg:
         print(f"check shape ---> pdg:{len(v_pdg)}, px:{len(v_px)}, py:{len(v_py)}, pz: {len(v_pz)} ")
         return (data_save, np.array(v_equen), np.array(v_vertex), v_pdg, v_px, v_py, v_pz)
@@ -182,6 +190,7 @@ if __name__ == "__main__":
     down_time = 200
     binwidth = 10
     plot_result = False
+    plot_single = False
     test_savefile = False
     save_pdg = False
     n_bins = (up_time+down_time)/binwidth
