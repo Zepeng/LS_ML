@@ -6,7 +6,7 @@
 import numpy as np
 import histlite as hl
 import matplotlib.pylab as plt
-# from modules import nEXOFitLikelihood
+from iminuit import Minuit
 from matplotlib.colors import LogNorm
 class FLH:
     def __init__(self):
@@ -14,7 +14,6 @@ class FLH:
         self.v_equen = np.array([])
         self.v_predict = np.array([])
         self.v_R3 = np.array([])
-        # self.model_tool = nEXOFitLikelihood.nEXOFitLikelihood()
     def LoadPrediction(self, infile:str):
         f = np.load(infile, allow_pickle=True)
         self.v_vertex = f["vertex"]
@@ -28,8 +27,8 @@ class FLH:
         print(f"content -> vertex: {self.v_vertex[:5]},\n equen: {self.v_equen[:5]},\n prediction:{self.v_predict[:5]}")
     def Get2Dhist(self):
         n_bins = 50
-        n_to_fit_sig = 50
-        n_to_fit_bkg = 1000
+        n_to_fit_sig = 200
+        n_to_fit_bkg = 3000
         range_hist = ((-0.01,1.01), (9, 32))
         predict_1 = self.v_predict[:,1]
         indices_bkg = (self.v_labels==0)
@@ -50,8 +49,8 @@ class FLH:
         hl.plot2d(ax1, h2d, log=True, cbar=True, clabel="counts per bin")
         SetTitle("Signal + Background")
 
-        h2d_sig = hl.hist((predict_1[indices_sig][:-n_to_fit_sig], equen[indices_sig][:-n_to_fit_sig]), bins=n_bins, range=range_hist)
-        h2d_bkg = hl.hist((predict_1[indices_bkg][:-n_to_fit_bkg], equen[indices_bkg][:-n_to_fit_bkg]), bins=n_bins, range=range_hist)
+        h2d_sig = hl.hist((predict_1[indices_sig][:-n_to_fit_sig], equen[indices_sig][:-n_to_fit_sig]), bins=n_bins, range=range_hist).normalize()
+        h2d_bkg = hl.hist((predict_1[indices_bkg][:-n_to_fit_bkg], equen[indices_bkg][:-n_to_fit_bkg]), bins=n_bins, range=range_hist).normalize()
         fig2, (ax2, ax3) = plt.subplots(1, 2, figsize=(16,6))
         hl.plot2d(ax2, h2d_sig, log=True, cbar=True, clabel="counts per bin")
         SetTitle("Signal", ax2)
@@ -74,8 +73,41 @@ class FLH:
         fig4, ax6 = plt.subplots()
         hl.plot2d(ax6,self.h2d_to_fit, log=True, cbar=True, clabel="counts per bin")
 
-    # def FitHist(self):
-    #     self.model_tool.AddDataset(self.h2d)
+    def LikelihoodFunc(self, v_n:np.ndarray):
+        """
+
+        Args:
+            v_n: v_n[0] is for the Nevt of signal e.g DSNB, v_n[1] is for the Nevt of bkg e.g nu_atm
+
+        Returns:
+            nll which are supposed to be minimized by minuit.
+
+        """
+        def LogFactorial(v_d_j:np.ndarray):
+            v_to_sum = np.zeros(v_d_j.shape)
+            for j in range(len(v_d_j)):
+                for k in range(len(v_d_j[j])):
+                    if v_d_j[j][k]>0:
+                        v_to_sum[j][k] = np.sum(np.array([np.log(i) for i in range(1,int(v_d_j[j][k])+1)]))
+            return v_to_sum
+        try_a = np.array([[0,1,2], [3, 4, 5]])
+
+        n_j = v_n[0]*self.h2d_sig.values + v_n[1]*self.h2d_bkg.values
+        #set pdf = 0 as 1 in order not to encounter nan in log(pdf)
+        log_n_j = np.zeros(n_j.shape)
+        indices = (n_j!=0)
+        log_n_j[indices] = np.log(n_j[indices])
+
+        nll = - np.sum(self.h2d_to_fit.values * log_n_j-n_j-LogFactorial(self.h2d_to_fit.values))
+        # print(f"nll:{nll}")
+        return nll
+
+    def FitHist(self):
+        v_n_initial = np.array([3, 500])
+        m = Minuit.from_array_func(self.LikelihoodFunc, v_n_initial, limit=[(0, None), (0, None)])
+        m.migrad()
+        print(m.values)
+
 
 
 if __name__ == '__main__':
@@ -83,7 +115,7 @@ if __name__ == '__main__':
     flh = FLH()
     flh.LoadPrediction(name_file_predict)
     flh.Get2Dhist()
-    print(flh.h2d)
-    # flh.FitHist()
+    # flh.LikelihoodFunc(np.array([1,100]))
+    flh.FitHist()
     # plt.show()
 
