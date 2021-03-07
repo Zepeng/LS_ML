@@ -69,6 +69,8 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
     v_px = []
     v_py = []
     v_pz = []
+    v_x_init, v_y_init, v_z_init = [], [], []
+    v_x_nosmear, v_y_nosmear, v_z_nosmear = [], [], []
     is_bkg = (name_type=="bkg")
     # for i in tqdm.tqdm(range(tchain.GetEntries())):
     if plot_single:
@@ -93,6 +95,19 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
         x = tchain.X
         y = tchain.Y
         z = tchain.Z
+        if is_bkg and study_initXYZ:
+            x_init = np.array(tchain.initx)
+            y_init = np.array(tchain.inity)
+            z_init = np.array(tchain.initz)
+            x_nosmear = np.array(tchain.X_NoSmear)
+            y_nosmear = np.array(tchain.Y_NoSmear)
+            z_nosmear = np.array(tchain.Z_NoSmear)
+            v_x_init.append(x_init)
+            v_y_init.append(y_init)
+            v_z_init.append(z_init)
+            v_x_nosmear.append(x_nosmear)
+            v_y_nosmear.append(y_nosmear)
+            v_z_nosmear.append(z_nosmear)
         if is_bkg and save_pdg:
             pdg = np.array(tchain.initpdg)
             px  = np.array(tchain.initpx)
@@ -154,7 +169,12 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
     # plt.semilogy()
     if plot_single:
         plt.legend()
-    if is_bkg and save_pdg:
+    if is_bkg and study_initXYZ and save_pdg:
+        print(f"check shape ---> pdg:{len(v_pdg)}, px:{len(v_px)}, py:{len(v_py)}, pz: {len(v_pz)} ")
+        print(f"check shape ---> X_init:{len(v_x_init)}, Y_init:{len(v_y_init)}, Z_init:{len(v_z_init)}")
+        print(f"check shape ---> X_nosmear:{len(v_x_nosmear)}, Y_nosmear:{len(v_y_nosmear)}, Z_nosmear:{len(v_z_nosmear)}")
+        return (data_save, np.array(v_equen), np.array(v_vertex), v_pdg, v_px, v_py, v_pz, v_x_init, v_y_init, v_z_init, v_x_nosmear, v_y_nosmear, v_z_nosmear)
+    elif is_bkg and save_pdg:
         print(f"check shape ---> pdg:{len(v_pdg)}, px:{len(v_px)}, py:{len(v_py)}, pz: {len(v_pz)} ")
         return (data_save, np.array(v_equen), np.array(v_vertex), v_pdg, v_px, v_py, v_pz)
     else:
@@ -260,6 +280,7 @@ if __name__ == "__main__":
     test_savefile = False
     save_pdg = True
     seperate_pmt_type = True
+    study_initXYZ = True
     if seperate_pmt_type:
         pmt_type = PMTType()
     n_bins = (up_time+down_time)/binwidth
@@ -296,15 +317,28 @@ if __name__ == "__main__":
     print(f"sig_entries : {sigchain.GetEntries()},  bkg_entries : { bkgchain.GetEntries()}")
     # bkgchain.Add('%s/*root' % bkg_dir)
     (data_save_sig, v_equen_sig, v_vertex_sig) = LoadData(sigchain, "sig", h2d_time_sig)
-    if save_pdg:
-        (data_save_bkg, v_equen_bkg, v_vertex_bkg, v_pdg_bkg, v_px_bkg, v_py_bkg, v_pz_bkg) = LoadData(bkgchain, "bkg", h2d_time_bkg)
+    if save_pdg and study_initXYZ :
+        (data_save_bkg, v_equen_bkg, v_vertex_bkg, v_pdg_bkg, v_px_bkg, v_py_bkg, v_pz_bkg, v_x_init, v_y_init,
+         v_z_init, v_x_nosmear, v_y_nosmear, v_z_nosmear) = LoadData(bkgchain, "bkg", h2d_time_bkg)
+        print(f"check pdg:{len(v_pdg_bkg)}, p:{len(v_px_bkg), len(v_py_bkg), len(v_pz_bkg)}")
+    elif save_pdg:
+        (data_save_bkg, v_equen_bkg, v_vertex_bkg, v_pdg_bkg, v_px_bkg, v_py_bkg, v_pz_bkg) = LoadData(bkgchain, "bkg",
+                                                                                                       h2d_time_bkg)
         print(f"check pdg:{len(v_pdg_bkg)}, p:{len(v_px_bkg), len(v_py_bkg), len(v_pz_bkg)}")
     else:
         (data_save_bkg, v_equen_bkg, v_vertex_bkg ) = LoadData(bkgchain, "bkg", h2d_time_bkg)
     # print(f"shape:   (data_save_sig:{data_save_sig.shape}), (v_equen_sig:{v_equen_sig}), (v_vertex_sig:{v_vertex_sig})")
-    if save_pdg:
+    if save_pdg and study_initXYZ:
         np.savez(arg.outfile, sig_NoWeightE=data_save_sig["NoWeightE"], sig_WeightE=data_save_sig["WeightE"], bkg_NoWeightE=data_save_bkg["NoWeightE"], bkg_WeightE=data_save_bkg["WeightE"], sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg,
-             bkg_pdg=np.array(v_pdg_bkg), bkg_px=np.array(v_px_bkg), bkg_py=np.array(v_py_bkg), bkg_pz=np.array(v_pz_bkg))
+             bkg_pdg=np.array(v_pdg_bkg), bkg_px=np.array(v_px_bkg), bkg_py=np.array(v_py_bkg), bkg_pz=np.array(v_pz_bkg),
+                 bkg_x_init=np.array(v_x_init), bkg_y_init=np.array(v_y_init), bkg_z_init=np.array(v_z_init),
+                 bkg_x_nosmear=np.array(v_x_nosmear), bkg_y_nosmear=np.array(v_y_nosmear), bkg_z_nosmear=np.array(v_z_nosmear))
+    elif save_pdg:
+        np.savez(arg.outfile, sig_NoWeightE=data_save_sig["NoWeightE"], sig_WeightE=data_save_sig["WeightE"],
+                 bkg_NoWeightE=data_save_bkg["NoWeightE"], bkg_WeightE=data_save_bkg["WeightE"],
+                 sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg,
+                 bkg_pdg=np.array(v_pdg_bkg), bkg_px=np.array(v_px_bkg), bkg_py=np.array(v_py_bkg),
+                 bkg_pz=np.array(v_pz_bkg))
     else:
         if not seperate_pmt_type:
             np.savez(arg.outfile, sig_NoWeightE=data_save_sig["NoWeightE"], sig_WeightE=data_save_sig["WeightE"], bkg_NoWeightE=data_save_bkg["NoWeightE"], bkg_WeightE=data_save_bkg["WeightE"], sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg)
