@@ -1,8 +1,11 @@
+import sys
+sys.path.append('/afs/ihep.ac.cn/users/l/luoxj/junofs_500G/sk_psd_DSNB/LS_ML/sk_psd/')
 import uproot as up
 import ROOT
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
+from GetPMTType import PMTType
 import tqdm
 def GenFilesList(dir_data:str, n_start_sig, n_start_bkg, step ):
     if dir_data[-1] != "/":
@@ -13,7 +16,10 @@ def GenFilesList(dir_data:str, n_start_sig, n_start_bkg, step ):
         filelist_sig.append(dir_data+"DSNB/data/dsnb_"+str(i_sig).zfill(6)+".root")
     for i_bkg in range(n_start_bkg, n_start_bkg+(step+1)*3-1):
         # filelist_bkg.append(dir_data+"AtmNu/data/atm_"+str(i_bkg).zfill(6)+".root")
-        filelist_bkg.append("/dybfs/users/chengj/data/PSD/AtmNC/Model-G/data/atm_" + str(i_bkg).zfill(6) + ".root")
+        # filelist_bkg.append("/dybfs/users/chengj/data/PSD/AtmNC/Model-G/data/atm_" + str(i_bkg).zfill(6) + ".root")
+        # filelist_bkg.append("root://junoeos01.ihep.ac.cn//eos/juno/user/luoxj/RawData_DSNB/AtmNC/Model-G/atm_" + str(i_bkg).zfill(6) + ".root")
+        filelist_bkg.append("root://junoeos01.ihep.ac.cn//eos/juno/user/luoxj/RawData_DSNB/AtmNC_withInitXYZ/Model-G/atm_" + str(i_bkg).zfill(6) + ".root")
+
     print("Filelist :", filelist_bkg, filelist_sig)
     return (filelist_sig, filelist_bkg)
 
@@ -56,7 +62,7 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
     max_index_hist = -10
     n_beforePeak = 20
     # data_save = np.zeros((tchain.GetEntries(), 2, len(bins_hist)-1), dtype=np.float32)
-    data_save = {"NoWeightE":[], "WeightE":[]}
+    data_save = {"NoWeightE":[], "WeightE":[], "NoWeightE_HAM":[], "NoWeightE_MCP":[], "WeightE_HAM":[], "WeightE_MCP":[]}
     v_equen = []
     v_vertex = []
     v_pdg = []
@@ -68,7 +74,7 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
     if plot_single:
         v_iter = range(1,10)
     else:
-        v_iter = range(tchain.GetEntries)
+        v_iter = range(tchain.GetEntries())
     for i in v_iter:
     # for i in range(1,10):
         if i % 200==0:
@@ -76,8 +82,12 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
         # plt.figure(name_type+str(i))
         tchain.GetEntry(i)
         pmtids = tchain.PMTID
-        npes = tchain.Charge
+        if seperate_pmt_type:
+            v_flag_HAM = [pmt_type.GetPMTType(pmtid) for pmtid in tchain.PMTID ]
+            v_flag_MCP = [not elem for elem in v_flag_HAM]
+        npes = np.array(tchain.Charge)
         hittime = tchain.Time
+        hittime = np.array(hittime)
         # print(f"check entry {i} ,hittime: {len(hittime)}")
         eqen = tchain.Eqen
         x = tchain.X
@@ -94,8 +104,14 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
             v_pz.append(pz)
         v_equen.append(eqen)
         v_vertex.append([x, y, z])
-        hist, bin_edges = np.histogram(hittime, bins=bins_hist, density=True)
-        hist_weightE, bin_edges_weightE = np.histogram(hittime, bins=bins_hist_weightE, weights=npes, density=True)
+        hist, bin_edges = np.histogram(hittime, bins=bins_hist)
+        hist_weightE, bin_edges_weightE = np.histogram(hittime, bins=bins_hist_weightE, weights=npes )
+        if seperate_pmt_type:
+            hist_HAM, bin_edges_HAM = np.histogram(hittime[v_flag_HAM], bins=bins_hist)
+            hist_MCP, bin_edges_MCP = np.histogram(hittime[v_flag_MCP], bins=bin_edges)
+            hist_weightE_HAM, bin_edges_weightE_HAM = np.histogram(hittime[v_flag_HAM], bins=bins_hist_weightE, weights=npes[v_flag_HAM] )
+            hist_weightE_MCP, bin_edges_weightE_MCP = np.histogram(hittime[v_flag_MCP], bins=bins_hist_weightE, weights=npes[v_flag_MCP] )
+
         # hist = hist/bins_width
         # hist_weightE = hist_weightE/bins_width_weightE
         # hist/= hist[18]
@@ -103,11 +119,18 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
 
         ################### divided by max###################################
         # print(f"check entry {i}, hist of hittime : {hist_weightE}")
-        # if max_index_hist == -10:
-        #     max_index_hist = hist.argmax()
-        # hist = hist/hist.max()
-        # hist_weightE = hist_weightE/hist_weightE.max()
-        ####################################################################
+        if max_index_hist == -10:
+            max_index_hist = hist.argmax()
+        hist = hist/hist.max()
+        hist_weightE = hist_weightE/hist_weightE.max()
+        if seperate_pmt_type:
+            hist_HAM, hist_MCP = hist_HAM/hist_HAM.max(), hist_MCP/hist_MCP.max()
+            hist_weightE_HAM, hist_weightE_MCP = hist_weightE_HAM/hist_weightE_HAM.max(), hist_weightE_MCP/hist_weightE_MCP.max()
+            data_save["NoWeightE_HAM"].append(np.array([hist_HAM]))
+            data_save["NoWeightE_MCP"].append(np.array([hist_MCP]))
+            data_save["WeightE_HAM"].append(np.array([hist_weightE_HAM]))
+            data_save["WeightE_MCP"].append(np.array([hist_weightE_MCP]))
+    ####################################################################
 
         # print(f"hist_weightE:  {hist_weightE}")
         # data_save[i] = np.array([hist, hist_weightE])
@@ -119,8 +142,8 @@ def LoadData(tchain:ROOT.TChain, name_type:str, h2d:ROOT.TH2D):
         if plot_result:
             # hist = hist_weightE[max_index_hist - n_beforePeak: max_index_hist + n_tail]
             # bin_edges = bin_edges_weightE[max_index_hist - n_beforePeak: max_index_hist + n_tail]
-            hist = hist_weightE
-            bin_edges = bin_edges_weightE
+            hist = hist_weightE_HAM
+            bin_edges = bin_edges_weightE_HAM
             # hist = hist
             # bin_edges = bin_edges
             for j_time in range(len(hist)):
@@ -154,6 +177,8 @@ def PlotTimeProfile(h2d_sig:ROOT.TH2D, h2d_bkg:ROOT.TH2D):
     return fig_profile_time
 def TestnpzOuput(name_infile:str):
     dataset = np.load(name_infile, allow_pickle=True)
+    print(f"key : {dataset.files}")
+
     # dataset_sig = dataset["sig"].item()
     # dataset_bkg = dataset["bkg"].item()
     # data_sig_NoweightE = dataset_sig["NoWeightE"]
@@ -164,6 +189,14 @@ def TestnpzOuput(name_infile:str):
     data_bkg_NoweightE = dataset["bkg_NoWeightE"]
     data_sig_weightE = dataset["sig_WeightE"]
     data_bkg_weightE = dataset["bkg_WeightE"]
+    data_sig_NoweightE_HAM = dataset["sig_NoWeightE_HAM"]
+    data_bkg_NoweightE_HAM = dataset["bkg_NoWeightE_HAM"]
+    data_sig_weightE_HAM = dataset["sig_WeightE_HAM"]
+    data_bkg_weightE_HAM = dataset["bkg_WeightE_HAM"]
+    data_sig_NoweightE_MCP = dataset["sig_NoWeightE_MCP"]
+    data_bkg_NoweightE_MCP = dataset["bkg_NoWeightE_MCP"]
+    data_sig_weightE_MCP = dataset["sig_WeightE_MCP"]
+    data_bkg_weightE_MCP = dataset["bkg_WeightE_MCP"]
     data_sig_vertex = dataset["sig_vertex"]
     data_bkg_vertex = dataset["bkg_vertex"]
     data_sig_equen = dataset["sig_equen"]
@@ -184,6 +217,39 @@ def TestnpzOuput(name_infile:str):
     print(f"data_bkg_NoWeightE: {data_bkg_NoweightE.shape}")
     print(f"data_sig_WeightE:  {data_sig_weightE.shape}")
     print(f"data_bkg_WeightE:  {data_bkg_weightE.shape}")
+    print(f"data_sig_NoWeightE_MCP: {data_sig_NoweightE_MCP.shape}")
+    print(f"data_bkg_NoWeightE_MCP: {data_bkg_NoweightE_MCP.shape}")
+    print(f"data_sig_WeightE_MCP:  {data_sig_weightE_MCP.shape}")
+    print(f"data_bkg_WeightE_MCP:  {data_bkg_weightE_MCP.shape}")
+    print(f"data_sig_NoWeightE_HAM: {data_sig_NoweightE_HAM.shape}")
+    print(f"data_bkg_NoWeightE_HAM: {data_bkg_NoweightE_HAM.shape}")
+    print(f"data_sig_WeightE_HAM:  {data_sig_weightE_HAM.shape}")
+    print(f"data_bkg_WeightE_HAM:  {data_bkg_weightE_HAM.shape}")
+
+    down_time = 0
+    up_time = 90
+    h2d_time_sig_HAM = ROOT.TH2D("h_time_sig_HAM", "h_time_sig_HAM", int(n_bins), -down_time, up_time, int(n_bins), 0, 1.1)
+    h2d_time_bkg_HAM = ROOT.TH2D("h_time_bkg_HAM", "h_time_bkg_HAM", int(n_bins), -down_time, up_time, int(n_bins), 0, 1.1)
+    h2d_time_sig_MCP = ROOT.TH2D("h_time_sig_MCP", "h_time_sig_MCP", int(n_bins), -down_time, up_time, int(n_bins), 0, 1.1)
+    h2d_time_bkg_MCP = ROOT.TH2D("h_time_bkg_MCP", "h_time_bkg_MCP", int(n_bins), -down_time, up_time, int(n_bins), 0, 1.1)
+    for i in range(len(data_sig_weightE)):
+        for j in range(len(data_sig_weightE[i][0])):
+            h2d_time_sig_HAM.Fill(j, data_sig_NoweightE_HAM[i][0][j])
+            h2d_time_sig_MCP.Fill(j, data_sig_NoweightE_MCP[i][0][j])
+    for i in range(len(data_bkg_weightE)):
+        for j in range(len(data_bkg_weightE[i][0])):
+            h2d_time_bkg_HAM.Fill(j, data_bkg_NoweightE_HAM[i][0][j])
+            h2d_time_bkg_MCP.Fill(j, data_bkg_NoweightE_MCP[i][0][j])
+    c_time_sig_HAM = ROOT.TCanvas("c_sig_HAM", "c_sig_HAM", 800, 600)
+    h2d_time_sig_HAM.DrawCopy("colz")
+    c_time_sig_MCP = ROOT.TCanvas("c_sig_MCP", "c_sig_MCP", 800, 600)
+    h2d_time_sig_MCP.DrawCopy("colz")
+    c_time_bkg_MCP = ROOT.TCanvas("c_bkg_MCP", "c_bkg_MCP", 800, 600)
+    h2d_time_bkg_MCP.DrawCopy("colz")
+    c_time_bkg_HAM = ROOT.TCanvas("c_bkg_HAM", "c_bkg_HAM", 800, 600)
+    h2d_time_bkg_HAM.DrawCopy("colz")
+    plt.figure()
+    plt.show()
 
 if __name__ == "__main__":
     up_time = 1000
@@ -192,7 +258,10 @@ if __name__ == "__main__":
     plot_result = False
     plot_single = False
     test_savefile = False
-    save_pdg = False
+    save_pdg = True
+    seperate_pmt_type = True
+    if seperate_pmt_type:
+        pmt_type = PMTType()
     n_bins = (up_time+down_time)/binwidth
     h2d_time_sig = ROOT.TH2D("h_time_sig", "h_time_sig", int(n_bins), -down_time, up_time, int(n_bins), 0, 1.1)
     h2d_time_bkg = ROOT.TH2D("h_time_bkg", "h_time_bkg", int(n_bins), -down_time, up_time, int(n_bins), 0, 1.1)
@@ -237,7 +306,16 @@ if __name__ == "__main__":
         np.savez(arg.outfile, sig_NoWeightE=data_save_sig["NoWeightE"], sig_WeightE=data_save_sig["WeightE"], bkg_NoWeightE=data_save_bkg["NoWeightE"], bkg_WeightE=data_save_bkg["WeightE"], sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg,
              bkg_pdg=np.array(v_pdg_bkg), bkg_px=np.array(v_px_bkg), bkg_py=np.array(v_py_bkg), bkg_pz=np.array(v_pz_bkg))
     else:
-        np.savez(arg.outfile, sig_NoWeightE=data_save_sig["NoWeightE"], sig_WeightE=data_save_sig["WeightE"], bkg_NoWeightE=data_save_bkg["NoWeightE"], bkg_WeightE=data_save_bkg["WeightE"], sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg)
+        if not seperate_pmt_type:
+            np.savez(arg.outfile, sig_NoWeightE=data_save_sig["NoWeightE"], sig_WeightE=data_save_sig["WeightE"], bkg_NoWeightE=data_save_bkg["NoWeightE"], bkg_WeightE=data_save_bkg["WeightE"], sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg)
+        else:
+            np.savez(arg.outfile, sig_NoWeightE=data_save_sig["NoWeightE"], sig_WeightE=data_save_sig["WeightE"],
+                     bkg_NoWeightE=data_save_bkg["NoWeightE"], bkg_WeightE=data_save_bkg["WeightE"],
+                     sig_NoWeightE_HAM = data_save_sig["NoWeightE_HAM"], sig_WeightE_HAM = data_save_sig["WeightE_HAM"],
+                     sig_NoWeightE_MCP = data_save_sig["NoWeightE_MCP"], sig_WeightE_MCP = data_save_sig["WeightE_MCP"],
+                     bkg_NoWeightE_HAM=data_save_bkg["NoWeightE_HAM"], bkg_WeightE_HAM=data_save_bkg["WeightE_HAM"],
+                     bkg_NoWeightE_MCP=data_save_bkg["NoWeightE_MCP"], bkg_WeightE_MCP=data_save_bkg["WeightE_MCP"],
+                     sig_vertex=v_vertex_sig, bkg_vertex=v_vertex_bkg, sig_equen=v_equen_sig, bkg_equen=v_equen_bkg)
     if plot_result:
         # print(f"sig_data: {data_save_sig.shape},\n bkg_data: {data_save_bkg.shape}")
         h2d_time_bkg.SetStats(False)
