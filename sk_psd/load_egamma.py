@@ -14,6 +14,7 @@ def LoadEGamma(rootfile, isTest=False):
         events.append([bins, gamma_tag[evtid]])
     return np.array(events)
 
+
 def test():
     events = LoadEGamma('/hpcfs/juno/junogpu/luoxj/Data_PSD/elecsim_Electron_001_SumAllPmtWaves.root')
     print(events)

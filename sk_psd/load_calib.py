@@ -48,7 +48,6 @@ def LoadCalib(rootfile, eventtype):
             events.append(bincontents/np.sum(bincontents))
         np.save('%s.npy' % eventtype, np.array(events))
         return np.array(events)
-
 def test():
     events = LoadCalib('/junofs/users/lirh/DYB/run67527.root', 'FastNeutron')
     print(events.shape)
