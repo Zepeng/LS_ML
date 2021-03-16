@@ -97,6 +97,8 @@ class FLH:
         else:
             h2d_sig_to_fit = []
         h2d_bkg_to_fit = hl.hist((self.predict_1[indices_bkg][index_to_fit_bkg], self.v_equen[indices_bkg][index_to_fit_bkg]), bins=self.n_bins)
+        from collections import Counter
+        self.input_sig_n = Counter(self.predict_1[indices_bkg][index_to_fit_bkg]>0.5)[True]
         if plot_2d_to_fit:
             fig3, (ax4, ax5) = plt.subplots(1, 2, figsize=(16,6))
             if n_to_fit_sig != 0:
@@ -140,12 +142,12 @@ class FLH:
         n_j = v_n[0]*self.h2d_sig.values + v_n[1]*self.h2d_bkg.values
         #set pdf = 0 as 1 in order not to encounter nan in log(pdf)
         log_n_j = np.zeros(n_j.shape)
-        indices = (n_j!=0)
+        indices = (n_j>0)
         log_n_j[indices] = np.log(n_j[indices])
 
         N_exp = v_n[0] + v_n[1]
 
-        nll = - np.sum(self.h2d_to_fit.values * log_n_j-n_j-LogFactorial(self.h2d_to_fit.values))
+        nll = - 2. * np.sum(self.h2d_to_fit.values * log_n_j-n_j-LogFactorial(self.h2d_to_fit.values))
         # nll = - np.sum(self.h2d_to_fit.values * log_n_j - n_j )
         # +N_exp - np.sum(self.h2d_to_fit.values)*np.log(N_exp)
         # print(f"nll:{nll}")
@@ -169,18 +171,33 @@ class FLH:
 
         # print(m.np_values())
         if check_result:
-            x = np.arange(self.n_bins)
-            y = np.arange(self.n_bins)
-            X, Y = np.meshgrid(x, y)
+            # x = np.arange(self.n_bins)
+            # y = np.arange(self.n_bins)
+            # X, Y = np.meshgrid(x, y)
+
             n_sig, n_bkg = m.np_values()
-            fig = plt.figure()
-            ax = plt.axes(projection="3d")
+            # fig = plt.figure()
+            # ax = plt.axes(projection="3d")
+            # Z_result = np.log(result_fit.values[indices])
             result_fit = n_sig * self.h2d_sig + n_bkg * self.h2d_bkg
             indices = (result_fit.values!=0)
-            # Z_result = np.log(result_fit.values[indices])
-            Z_result = result_fit.values[indices]
-            ax.scatter(X[indices], Y[indices], Z_result, c=Z_result, s=5, cmap=plt.hot(), marker=1)
-            ax.scatter(X, Y, self.h2d_to_fit.values,c=self.h2d_to_fit.values,  cmap='viridis', s=5, marker=2)
+            # Z_result = result_fit.values[indices]
+            fig_profile_PSD, ax_profile_PSD = plt.subplots()
+            hl.plot1d(ax_profile_PSD, result_fit.project([0]), label="Fit Result")
+            hl.plot1d(ax_profile_PSD, self.h2d_to_fit.project([0]), label="Input PDF")
+            ax_profile_PSD.set_xlabel("PSD Output")
+            plt.title("Projection of PSD Output")
+            plt.legend()
+            fig_profile_Edep, ax_profile_Edep = plt.subplots()
+            hl.plot1d(ax_profile_Edep, result_fit.project([1]),label="Fit Result")
+            hl.plot1d(ax_profile_Edep, self.h2d_to_fit.project([1]), label="Input PDF")
+            ax_profile_Edep.set_xlabel("$E_{quen}$")
+            plt.title("Projection of $E_{quen}$")
+            plt.legend()
+
+
+            # ax.scatter(X[indices], Y[indices], Z_result, c=Z_result, s=5, cmap=plt.hot(), marker=1)
+            # ax.scatter(X, Y, self.h2d_to_fit.values,c=self.h2d_to_fit.values,  cmap='viridis', s=5, marker=2)
 
             # hl.plot2d(ax, result_fit, cbar=True, log=True)
         return (m.np_values(), m.fval)
@@ -208,12 +225,14 @@ if __name__ == '__main__':
     if no_fix_fit_only:
         v_fit_result = {"sig": [], "bkg": []}
         v_fit_val_nofix = []
-        for i in range(500):
+        v_fit_truth_bkg=[]
+        for i in range(200):
             num_iterations = 0
             flh.GetHistToFit(n_to_fit_bkg=n_to_fit_bkg, n_to_fit_sig=n_to_fit_sig,
                              n_remain_to_fit_sig=n_to_fit_sig * scale_to_fit_dataset,
                              n_remain_to_fit_bkg=n_to_fit_bkg * scale_to_fit_dataset)
             v_n, f_val = flh.FitHistZeroFix([np.random.randint(0, 100), np.random.randint(0, 5000)])
+            #v_n, f_val = flh.FitHistZeroFix([0, np.random.randint(0, 5000)])
             while not (flh.fitter.get_fmin()['is_valid'] and flh.fitter.get_fmin()['has_accurate_covar']):
                 if num_iterations > 9:
                     break
@@ -223,7 +242,12 @@ if __name__ == '__main__':
             v_fit_result["sig"].append(v_n[0])
             v_fit_result["bkg"].append(v_n[1])
             v_fit_val_nofix.append(f_val)
+            v_fit_truth_bkg.append(flh.input_sig_n)
 
+        plt.figure()
+        plt.hist2d(v_fit_truth_bkg, v_fit_result["bkg"])
+        plt.xlabel("Input bkg. number")
+        plt.ylabel("Fit bkg. number")
         plt.figure()
         if n_to_fit_sig != 0:
             plt.hist(v_fit_result["sig"], histtype="step", label="bkg", bins=50)
@@ -233,6 +257,8 @@ if __name__ == '__main__':
         plt.figure()
         plt.hist(v_fit_result["bkg"], histtype="step", label="sig",bins=100)
         plt.xlabel("N of Background")
+        plt.figure()
+        plt.hist2d(v_fit_result["sig"], v_fit_result["bkg"])
         # print("v_fit_result:\t", v_fit_result)
     else:
         n_fix_sig_num_try = 30
