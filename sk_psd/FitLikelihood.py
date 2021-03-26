@@ -7,6 +7,7 @@ import numpy as np
 import histlite as hl
 import matplotlib.pylab as plt
 from iminuit import Minuit
+from collections import Counter
 plt.style.use("/afs/ihep.ac.cn/users/l/luoxj/Style/Paper.mplstyle")
 fit_down_limit = 0
 def SetTitle(title:str, ax:plt.Axes=None):
@@ -35,19 +36,27 @@ class FLH:
         print("check loading status")
         print(f"length -> vertex: {len(self.v_vertex)}, equen: {len(self.v_equen)}, prediction:{len(self.v_predict)}")
         print(f"content -> vertex: {self.v_vertex[:5]},\n equen: {self.v_equen[:5]},\n prediction:{self.v_predict[:5]}")
+    def GetBkgRatio(self):
+        bkg_criteria = self.n_bins[0][0]
+        self.ratio_bkg =  Counter(self.v_predict[self.v_labels==0][:,1]>bkg_criteria)[True]/len(self.v_predict)
+        self.ratio_sig =  Counter(self.v_predict[self.v_labels==1][:,1]>bkg_criteria)[True]/len(self.v_predict)
+        # print("ratio:\t", self.ratio_bkg)
+        # print(Counter(self.v_predict[:,1]>bkg_criteria))
 
-
-
-    def Get2DPDFHist(self, n_remain_to_fit_sig, n_remain_to_fit_bkg):
+    def Get2DPDFHist(self):
         plot_2d_pdf = False
         # n_bins = [np.array([0,0.1, 0.2,0.3, 0.5, 0.7, 0.9, 0.95, 0.96, 0.97, 0.98, 0.99, 1.1]), np.arange(9, 32)]
         # n_bins = [np.array([ 0.5, 0.7, 0.9, 0.95, 0.96 , 0.97, 0.98, 0.985, 0.99,0.995, 1.001]), np.arange(9, 32)]
         # n_bins = [np.array([ 0.5, 0.7, 0.9, 0.95, 0.96 , 0.97, 0.98, 0.985, 0.99,0.995, 1.001]), np.linspace(9, 32, 10)]
-        n_bins = [np.array([ 0.5, 0.95, 0.975,  1.001]), np.linspace(9, 32, 5)]
-        # n_bins = [np.array([0,0.5, 0.7, 0.9, 0.95, 1.01]), np.arange(9,32)]
+        if fit_2d:
+            n_bins = [np.array([ 0.5, 0.95, 0.975,  1.001]), np.linspace(9, 32, 8)]
+        else:
+            n_bins = [np.array([ 0.95, 1.001]), np.linspace(9, 32, 8)]
+        self.n_bins_full = [np.concatenate((np.array([0]), n_bins[0])), n_bins[1]]
         # n_bins = 50
         self.n_bins = n_bins
-        range_hist = ((-0.01,1.01), (9, 32))
+        # self.GetBkgRatio()
+        # range_hist = ((-0.01,1.01), (9, 32))
         predict_1 = self.v_predict[:,1]
         self.predict_1 = predict_1
         indices_bkg = (self.v_labels==0)
@@ -56,17 +65,14 @@ class FLH:
 
         # plot 2D hist PDF
         fig1, ax1 = plt.subplots()
-        h2d = hl.hist((predict_1, equen), bins=n_bins, range=range_hist)
+        h2d = hl.hist((predict_1, equen), bins=n_bins)
         hl.plot2d(ax1, h2d, log=True, cbar=True, clabel="counts per bin")
         SetTitle("Signal + Background")
 
-        # h2d_sig = hl.hist((predict_1[indices_sig][:-n_to_fit_sig], equen[indices_sig][:-n_to_fit_sig]), bins=n_bins, range=range_hist).normalize(integrate=False)
-        # h2d_bkg = hl.hist((predict_1[indices_bkg][:-n_to_fit_bkg], equen[indices_bkg][:-n_to_fit_bkg]), bins=n_bins, range=range_hist).normalize(integrate=False)
-        if n_remain_to_fit_sig != 0:
-            h2d_sig = hl.hist((predict_1[indices_sig][:-n_remain_to_fit_sig], equen[indices_sig][:-n_remain_to_fit_sig]), bins=n_bins).normalize(integrate=False)
-        else:
-            h2d_sig = hl.hist((predict_1[indices_sig], equen[indices_sig]), bins=n_bins).normalize(integrate=False)
-        h2d_bkg = hl.hist((predict_1[indices_bkg][:-n_remain_to_fit_bkg], equen[indices_bkg][:-n_remain_to_fit_bkg]), bins=n_bins).normalize(integrate=False)
+        h2d_sig = hl.hist((predict_1[indices_sig], equen[indices_sig]), bins=n_bins).normalize(integrate=False)
+        h2d_bkg = hl.hist((predict_1[indices_bkg], equen[indices_bkg]), bins=n_bins).normalize(integrate=False)
+        self.h2d_sig_full = hl.hist((predict_1[indices_sig], equen[indices_sig]), bins=self.n_bins_full).normalize(integrate=False)
+        self.h2d_bkg_full = hl.hist((predict_1[indices_bkg], equen[indices_bkg]), bins=self.n_bins_full).normalize(integrate=False)
         if plot_2d_pdf:
             fig2, (ax2, ax3) = plt.subplots(1, 2, figsize=(16,6))
             hl.plot2d(ax2, h2d_sig, log=True, cbar=True, clabel="counts per bin")
@@ -78,27 +84,20 @@ class FLH:
         self.h2d_bkg = h2d_bkg
         self.h2d_sig = h2d_sig
 
-    def GetHistToFit(self, n_to_fit_sig:int, n_to_fit_bkg:int, n_remain_to_fit_bkg:int, n_remain_to_fit_sig:int):
-        plot_2d_to_fit = False
-        indices_bkg = (self.v_labels==0)
-        indices_sig = (self.v_labels==1)
-        if n_remain_to_fit_sig != 0:
-            index_begin_sig = len(self.v_equen[indices_sig][:-n_remain_to_fit_sig])
-        else:
-            index_begin_sig = len(self.v_equen[indices_sig])
 
-        index_begin_bkg = len(self.v_equen[indices_bkg][:-n_remain_to_fit_bkg])
-        index_to_fit_sig = np.random.randint(index_begin_sig, len(self.v_equen[indices_sig]), size=n_to_fit_sig)
-        index_to_fit_bkg = np.random.randint(index_begin_bkg, len(self.v_equen[indices_bkg]), size=n_to_fit_bkg)
-        # h2d_sig_to_fit = hl.hist((predict_1[indices_sig][-n_to_fit_sig:], equen[indices_sig][-n_to_fit_sig:]), bins=n_bins, range=range_hist)
-        # h2d_bkg_to_fit = hl.hist((predict_1[indices_bkg][-n_to_fit_bkg:], equen[indices_bkg][-n_to_fit_bkg:]), bins=n_bins, range=range_hist)
-        if n_remain_to_fit_sig!=0:
-            h2d_sig_to_fit = hl.hist((self.predict_1[indices_sig][index_to_fit_sig], self.v_equen[indices_sig][index_to_fit_sig]), bins=self.n_bins)
-        else:
-            h2d_sig_to_fit = []
-        h2d_bkg_to_fit = hl.hist((self.predict_1[indices_bkg][index_to_fit_bkg], self.v_equen[indices_bkg][index_to_fit_bkg]), bins=self.n_bins)
+    def GetHistToFit(self, n_to_fit_sig:int, n_to_fit_bkg:int, seed:int):
+        plot_2d_to_fit = False
+
         from collections import Counter
-        self.input_sig_n = Counter(self.predict_1[indices_bkg][index_to_fit_bkg]>0.5)[True]
+
+        sig_sample = self.h2d_sig_full.sample(np.random.poisson(n_to_fit_sig), seed=seed)
+        bkg_sample = self.h2d_bkg_full.sample(np.random.poisson(n_to_fit_bkg), seed=seed)
+        # sig_sample = self.h2d_sig_full.sample(int(n_to_fit_sig), seed=seed)
+        # bkg_sample = self.h2d_bkg_full.sample(int(n_to_fit_bkg), seed=seed)
+        h2d_sig_to_fit = hl.hist((sig_sample[0], sig_sample[1]), bins=self.n_bins)
+        h2d_bkg_to_fit = hl.hist((bkg_sample[0], bkg_sample[1]), bins=self.n_bins)
+        self.input_sig_n = np.sum(h2d_sig_to_fit.values)
+        self.input_bkg_n = np.sum(h2d_bkg_to_fit.values)
         if plot_2d_to_fit:
             fig3, (ax4, ax5) = plt.subplots(1, 2, figsize=(16,6))
             if n_to_fit_sig != 0:
@@ -111,10 +110,8 @@ class FLH:
 
         self.h2d_sig_to_fit = h2d_sig_to_fit
         self.h2d_bkg_to_fit = h2d_bkg_to_fit
-        if n_remain_to_fit_sig != 0:
-            self.h2d_to_fit = h2d_sig_to_fit + h2d_bkg_to_fit
-        else:
-            self.h2d_to_fit =h2d_bkg_to_fit
+        self.h2d_to_fit = h2d_sig_to_fit + h2d_bkg_to_fit
+        # print(np.sum(h2d_sig_to_fit.values), np.sum(h2d_bkg_to_fit.values), np.sum(self.h2d_to_fit.values))
         if plot_2d_to_fit:
             fig4, ax6 = plt.subplots()
             hl.plot2d(ax6,self.h2d_to_fit, log=True, cbar=True, clabel="counts per bin")
@@ -159,7 +156,7 @@ class FLH:
         m = Minuit.from_array_func(self.LikelihoodFunc, v_n_initial, limit=[(fit_down_limit, None), (0, None)], errordef=0.5)
         m.migrad()
         self.fitter = m
-        print(m.values)
+        #print(m.values)
         if  check_zero_result and m.np_values()[0] <=10.5 and m.np_values()[0]>=9.5:
             fig3, (ax4, ax5) = plt.subplots(1, 2, figsize=(16,6))
             hl.plot2d(ax4, flh.h2d_sig_to_fit, log=True, cbar=True, clabel="counts per bin")
@@ -205,32 +202,30 @@ class FLH:
         m = Minuit.from_array_func(self.LikelihoodFunc, v_n_initial, limit=[(fit_down_limit, None), (0, None)],\
                                    fix=[True, False], errordef=0.5 )
         m.migrad()
-        print(m.values)
+        # print(m.values)
         return (m.np_values(),m.fval)
 
     # def FitHistFixOne(self):
 
 
 if __name__ == '__main__':
+    fit_2d = False
     name_file_predict = "./model_maxtime_time_jobs_DSNB_sk_data/predict_0.npz"
     no_fix_fit_only = False
     flh = FLH()
     flh.LoadPrediction(name_file_predict)
-    n_to_fit_bkg = 800
+    n_to_fit_bkg = 460
     n_to_fit_sig = 0
     scale_to_fit_dataset = 20
 
-    flh.Get2DPDFHist(n_remain_to_fit_bkg=n_to_fit_bkg*scale_to_fit_dataset, n_remain_to_fit_sig=n_to_fit_sig*scale_to_fit_dataset)
-    # flh.LikelihoodFunc(np.array([1,100]))
+    flh.Get2DPDFHist()
     if no_fix_fit_only:
         v_fit_result = {"sig": [], "bkg": []}
         v_fit_val_nofix = []
         v_fit_truth_bkg=[]
-        for i in range(200):
+        for i in range(100):
             num_iterations = 0
-            flh.GetHistToFit(n_to_fit_bkg=n_to_fit_bkg, n_to_fit_sig=n_to_fit_sig,
-                             n_remain_to_fit_sig=n_to_fit_sig * scale_to_fit_dataset,
-                             n_remain_to_fit_bkg=n_to_fit_bkg * scale_to_fit_dataset)
+            flh.GetHistToFit(n_to_fit_bkg=n_to_fit_bkg, n_to_fit_sig=n_to_fit_sig, seed=i)
             v_n, f_val = flh.FitHistZeroFix([np.random.randint(0, 100), np.random.randint(0, 5000)])
             #v_n, f_val = flh.FitHistZeroFix([0, np.random.randint(0, 5000)])
             while not (flh.fitter.get_fmin()['is_valid'] and flh.fitter.get_fmin()['has_accurate_covar']):
@@ -242,7 +237,7 @@ if __name__ == '__main__':
             v_fit_result["sig"].append(v_n[0])
             v_fit_result["bkg"].append(v_n[1])
             v_fit_val_nofix.append(f_val)
-            v_fit_truth_bkg.append(flh.input_sig_n)
+            v_fit_truth_bkg.append(flh.input_bkg_n)
 
         plt.figure()
         plt.hist2d(v_fit_truth_bkg, v_fit_result["bkg"])
@@ -252,7 +247,7 @@ if __name__ == '__main__':
         if n_to_fit_sig != 0:
             plt.hist(v_fit_result["sig"], histtype="step", label="bkg", bins=50)
         else:
-            plt.hist(v_fit_result["sig"], histtype="step", label="bkg", bins=100, range=(-1, 3))
+            plt.hist(v_fit_result["sig"], histtype="step", label="bkg", bins=100)
         plt.xlabel("N of Signal")
         plt.figure()
         plt.hist(v_fit_result["bkg"], histtype="step", label="sig",bins=100)
@@ -261,16 +256,19 @@ if __name__ == '__main__':
         plt.hist2d(v_fit_result["sig"], v_fit_result["bkg"])
         # print("v_fit_result:\t", v_fit_result)
     else:
+        from scipy.interpolate import interp1d
         n_fix_sig_num_try = 30
+        chi2_criteria = 2.706
+        v_uplimit_n_sig = []
         n_max_sig = 30
         v_n_sig_to_fix = np.linspace(0, n_max_sig, n_fix_sig_num_try)
         v_fit_result = {"sig": [], "bkg": []}
         v2D_chi2 = [] # dimension 0 is for the times of trying , dimension 1 is for the number of fix signal
         num_iterations = 0
-        for i in range(20):
-            flh.GetHistToFit(n_to_fit_bkg=n_to_fit_bkg, n_to_fit_sig=n_to_fit_sig,
-                             n_remain_to_fit_sig=n_to_fit_sig * scale_to_fit_dataset,
-                             n_remain_to_fit_bkg=n_to_fit_bkg * scale_to_fit_dataset)
+        for i in range(100):
+            if i %100 ==0:
+                print(f"Processing {i} times fitting")
+            flh.GetHistToFit(n_to_fit_bkg=n_to_fit_bkg, n_to_fit_sig=n_to_fit_sig, seed=i)
             v_n, f_val_nofix = flh.FitHistZeroFix([np.random.randint(0, 100), np.random.randint(0, 5000)])
             while not (flh.fitter.get_fmin()['is_valid'] and flh.fitter.get_fmin()['has_accurate_covar']):
                 if num_iterations > 9:
@@ -278,33 +276,68 @@ if __name__ == '__main__':
                 print(f"Refitting!! {num_iterations} times")
                 v_n, f_val_nofix = flh.FitHistZeroFix([np.random.randint(0,100), np.random.randint(0,5000)])
                 num_iterations += 1
-            print("f_val_nofix:\t", f_val_nofix)
+            # print("f_val_nofix:\t", f_val_nofix)
             v_chi2 = []
             for j in v_n_sig_to_fix:
                 v_n_fix, f_val_fix =flh.FitHistFixSigN(v_n_initial=[j, np.random.randint(0, 5000)])
-                print("f_val_fix:\t",f_val_fix )
+                # print("f_val_fix:\t",f_val_fix )
                 v_chi2.append(f_val_fix-f_val_nofix)
+            index_min = np.argmin(v_chi2)
+            try:
+                f = interp1d( v_chi2[index_min:], v_n_sig_to_fix[index_min:], kind="linear", fill_value="extrapolate")
+                uplimit_n_sig = f(chi2_criteria)
+                v_uplimit_n_sig.append(uplimit_n_sig)
+            except Exception:
+                continue
             v2D_chi2.append(v_chi2)
             v_fit_result["sig"].append(v_n[0])
             v_fit_result["bkg"].append(v_n[1])
+
+            # Check Getting uplimit
+            # plt.figure()
+            # plt.plot(v_n_sig_to_fix, v_chi2)
+            # plt.plot([0, n_max_sig], [chi2_criteria, chi2_criteria], "--", label="90% confidence")
+            # print("uplimit:\t",uplimit_n_sig)
+            # print("chi2:\t", v_chi2)
+            # print("index:\t", index_min)
+            # plt.show()
+
 
         plt.figure()
         if n_to_fit_sig != 0:
             plt.hist(v_fit_result["sig"], histtype="step", label="bkg", bins=50)
         else:
-            plt.hist(v_fit_result["sig"], histtype="step", label="bkg", bins=100, range=(-1, 3))
+            plt.hist(v_fit_result["sig"], histtype="step", label="bkg", bins=100)
 
         plt.xlabel("N of Signal")
+
         plt.figure()
         plt.hist(v_fit_result["bkg"], histtype="step", label="sig", bins=100)
         plt.xlabel("N of Background")
+
         plt.figure()
         for i in range(len(v2D_chi2)):
             plt.plot(v_n_sig_to_fix,v2D_chi2[i])
-        plt.plot([0, n_max_sig], [2.706, 2.706],"--", label="90% confidence")
+        plt.plot([0, n_max_sig], [chi2_criteria, chi2_criteria],"--", label="90% confidence")
+        plt.ylim(0,10)
         plt.xlabel("Number of Signal Counts")
         plt.ylabel("$L_{min}^{fix}-L_{min}^{nofix}$")
         plt.legend()
+
+        plt.figure()
+        v_uplimit_n_sig = np.array(v_uplimit_n_sig).reshape(-1)
+        # print(v_uplimit_n_sig)
+        h_uplimit = plt.hist(v_uplimit_n_sig, histtype="step", bins=10)
+        median_uplimit = np.median(v_uplimit_n_sig)
+        print("median:\t", median_uplimit)
+        plt.plot([median_uplimit, median_uplimit], [0, np.max(h_uplimit[0])], "--")
+        plt.xlabel("Uplimit of Number of signal")
+        if fit_2d:
+            np.save("v_uplimit_2d.npy", v_uplimit_n_sig)
+        else:
+            np.save("v_uplimit_1d.npy", v_uplimit_n_sig)
+
+
     plt.show()
 
 ### dictionary map : /junofs_500G/sk_psd_DSNB
