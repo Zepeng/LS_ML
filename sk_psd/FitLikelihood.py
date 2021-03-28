@@ -205,10 +205,10 @@ class FLH:
     def FitHistZeroFix(self, v_n_initial):
         check_result = False
         check_zero_result = False
-        v_limit_other_bkg = []
+        v_limit = [(fit_down_limit_sig, None), (0, None)]
         for i in range(len(v_n_initial)-2):
-            v_limit_other_bkg.append((fit_down_limit_other_bkg, None))
-        m = Minuit.from_array_func(self.LikelihoodFunc, v_n_initial, limit=[(fit_down_limit_sig, None), (0, None), (fit_down_limit_other_bkg, None)], errordef=0.5)
+            v_limit.append((fit_down_limit_other_bkg, None))
+        m = Minuit.from_array_func(self.LikelihoodFunc, v_n_initial, limit=v_limit, errordef=0.5)
         m.migrad()
         self.fitter = m
         #print(m.values)
@@ -256,11 +256,13 @@ class FLH:
         return (m.np_values(), m.fval)
     def FitHistFixSigN(self, v_n_initial):
         v_limit = [(fit_down_limit_sig, None), (0, None)]
+        v_fix = [ True, False]
         for i in range(len(v_n_initial)-2):
             v_limit.append((fit_down_limit_other_bkg, None))
+            v_fix.append(False)
             # .extend([False for i in range(len(v_n_initial) - 2)])
         m = Minuit.from_array_func(self.LikelihoodFunc, v_n_initial, limit=v_limit,\
-                                   fix=[True, False, False], errordef=0.5 )
+                                   fix=v_fix, errordef=0.5 )
         m.migrad()
         # print(m.values)
         return (m.np_values(),m.fval)
@@ -269,7 +271,7 @@ class FLH:
 
 
 if __name__ == '__main__':
-    fit_2d = False
+    fit_2d = True
     # fit_2d = False
     name_file_predict = "./model_maxtime_time_jobs_DSNB_sk_data/predict_0.npz"
     only_best_fit = False
@@ -279,12 +281,19 @@ if __name__ == '__main__':
     dir_other_bkg = {}
     flh = FLH()
     flh.LoadPrediction(name_file_predict)
-    flh.LoadOtherBkg("/afs/ihep.ac.cn/users/l/luoxj/sk_psd/model_maxtime_time_jobs_DSNB_sk_data/CC_samplespredict_0.npz",
-                     key="CC_samples",
+    flh.LoadOtherBkg("/afs/ihep.ac.cn/users/l/luoxj/sk_psd/model_maxtime_time_jobs_DSNB_sk_data/atm-CC_samples_predict_0.npz",
+                     key="dict_samples",
                      key_in_dict="CC")
+    flh.LoadOtherBkg("/afs/ihep.ac.cn/users/l/luoxj/sk_psd/model_maxtime_time_jobs_DSNB_sk_data/Reactor-anti-Nu_samples_predict_0.npz",
+                     key="dict_samples",
+                     key_in_dict="Reactor-anti-Nu")
+
+    flh.LoadOtherBkg("/afs/ihep.ac.cn/users/l/luoxj/sk_psd/model_maxtime_time_jobs_DSNB_sk_data/Li9He8_samples_predict_0.npz",
+                     key="dict_samples",
+                     key_in_dict="He8Li9")
     n_to_fit_bkg_NC = 460
     n_to_fit_sig = 0
-    dir_n_other_bkg = {"CC":2.4,  "FastN":9.7, "He8Li9":0.08}
+    dir_n_other_bkg = {"CC":2.4,  "FastN":9.7, "He8Li9":0.08, "Reactor-anti-Nu":3.4}
     flh.SetNOtherBkg(dir_n_other_bkg)
 
     flh.Get2DPDFHist()
@@ -333,8 +342,8 @@ if __name__ == '__main__':
         v_n_sig_to_fix = np.linspace(0, n_max_sig, n_fix_sig_num_try)
         v_fit_result = {"sig": [], "bkg": []}
         v2D_chi2 = [] # dimension 0 is for the times of trying , dimension 1 is for the number of fix signal
-        num_iterations = 0
         for i in range(100):
+            num_iterations = 0
             if i %100 ==0:
                 print(f"Processing {i} times fitting")
             v_n_other_bkg_initial = np.random.randint(0, 1000, size=len(flh.dir_h2d_other_bkg.keys()))
