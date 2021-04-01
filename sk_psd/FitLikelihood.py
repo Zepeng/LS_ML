@@ -519,6 +519,8 @@ if __name__ == '__main__':
                 if not set_initial_epsilon_zeros:
                     v_n_other_bkg_initial_epsilon = np.random.uniform(-1, 1, size=len(flh.dir_h2d_other_bkg.keys()))
                     NC_bkg_initial_epsilon = np.random.uniform(-1, 1)
+
+
                 else:
                     v_n_other_bkg_initial_epsilon = np.zeros(len(flh.dir_h2d_other_bkg.keys()))
                     NC_bkg_initial_epsilon = 0
