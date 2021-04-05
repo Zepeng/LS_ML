@@ -9,8 +9,17 @@ import matplotlib.pylab as plt
 from iminuit import Minuit
 from collections import Counter
 from tqdm import trange
+from matplotlib.colors import LogNorm
+
 plt.style.use("/afs/ihep.ac.cn/users/l/luoxj/Style/Paper.mplstyle")
+
 def SetTitle(title:str, ax:plt.Axes=None):
+    """
+    # This function is for set title for the 2d histogram of PSD Vs. E distribution
+    :param title:
+    :param ax:
+    :return:
+    """
     if ax == None:
         plt.title(title)
         plt.xlabel("Prediction Output")
@@ -19,7 +28,11 @@ def SetTitle(title:str, ax:plt.Axes=None):
         ax.set_title(title)
         ax.set_xlabel("Prediction Output")
         ax.set_ylabel("$E_{quen}$")
+
 class FLH:
+    """
+    This class is for doing the two dimensional fitting(PSD and E) using max Likelihood
+    """
     def __init__(self):
         self.check_result = True
         self.check_result_threshold = 50
@@ -36,9 +49,15 @@ class FLH:
         self.seed = 0
         self.v_nll = []
         self.plot_v_nll = False
+
     def SetNOtherBkg(self, dir_n_other_bkg:dict):
         self.dir_n_other_bkg = dir_n_other_bkg
+
     def LoadPrediction(self, infile:str):
+        """
+        :param infile: path for PSD output file
+        :return:
+        """
         f = np.load(infile, allow_pickle=True)
         self.v_vertex = f["vertex"]
         self.v_equen = f["equen"]
@@ -49,49 +68,70 @@ class FLH:
         print("check loading status")
         print(f"length -> vertex: {len(self.v_vertex)}, equen: {len(self.v_equen)}, prediction:{len(self.v_predict)}")
         print(f"content -> vertex: {self.v_vertex[:5]},\n equen: {self.v_equen[:5]},\n prediction:{self.v_predict[:5]}")
+
     def GetBkgRatio(self):
-        # bkg_criteria = self.n_bins[0][0]
-        bkg_criteria = 0.5
+        """
+        This function is for calculating the ratio of efficiency from binning strategy
+        :return:
+        """
+        bkg_criteria = self.n_bins[0][0]
+        # bkg_criteria = 0.5
         self.ratio_bkg_NC =  Counter(self.v_predict[self.v_labels==0][:,1]>bkg_criteria)[True]/len(self.v_predict[self.v_labels==0])
         self.ratio_sig =  Counter(self.v_predict[self.v_labels==1][:,1]>bkg_criteria)[True]/len(self.v_predict)
         print("ratio:\t", self.ratio_bkg_NC)
         print(Counter(self.v_predict[:,1]>bkg_criteria))
         exit()
-    def LoadOtherBkg(self, name_file:str, key:str, key_in_dict:str, sys_uncertrainty:float):
+
+    def LoadOtherBkg(self, name_file:str, key:str, key_in_dict:str, sys_uncertainty:float):
+        """
+
+        :param name_file: path for other background file
+        :param key: the key to get the dictionary in files
+        :param key_in_dict: the key using in this code (which is for the variable "self.dir_other_bkg")
+        :param sys_uncertainty: set the system uncertainty of this background
+        :return:
+        """
         f = np.load(name_file, allow_pickle=True)
         samples = f[key].item()
         self.dir_other_bkg[key_in_dict] = samples
-        self.dir_other_bkg_sys_uncertainty[key_in_dict] = sys_uncertrainty
-        # if key_in_dict == "FastN":
-        #     self.dir_other_bkg[key_in_dict]["equen"] = np.random.uniform(10, 31, size=len(self.dir_other_bkg[key_in_dict]["equen"]))
-
+        self.dir_other_bkg_sys_uncertainty[key_in_dict] = sys_uncertainty
+        print(f"Events number for PDF({key_in_dict}):\t ", len(samples["equen"]))
 
     def Get2DPDFHist(self, fit_2d):
+        """
+        Get PDF for fitting
+        :param fit_2d: boolean for whether using the 2d fitting
+        :return:
+        """
         plot_2d_pdf = False
         plot_pdf_projection = False
-        # n_bins = [np.array([ 0.5, 0.7, 0.9, 0.95, 0.96 , 0.97, 0.98, 0.985, 0.99,0.995, 1.001]), np.arange(9, 32)]
-        # n_bins = [np.array([ 0.5, 0.7, 0.9, 0.95, 0.96 , 0.97, 0.98, 0.985, 0.99,0.995, 1.001]), np.linspace(9, 32, 10)]
+
+        # binning strategy for fitting
         if fit_2d:
             n_bins = [np.array([  0.5, 0.95, 0.975,  1.001]), np.linspace(9, 32, 8)]
             # n_bins = [np.array([ 0.4, 0.7, 0.95, 0.975,  1.001]), np.linspace(9, 32, 8)]
             # n_bins = [np.array([0,0.1, 0.2,0.3, 0.5, 0.7, 0.9, 0.95, 0.96, 0.97, 0.98, 0.99, 1.001]), np.arange(9, 32)]
+            # n_bins = [np.array([ 0.5, 0.7, 0.9, 0.95, 0.96 , 0.97, 0.98, 0.985, 0.99,0.995, 1.001]), np.arange(9, 32)]
+            # n_bins = [np.array([ 0.5, 0.7, 0.9, 0.95, 0.96 , 0.97, 0.98, 0.985, 0.99,0.995, 1.001]), np.linspace(9, 32, 10)]
         else:
             n_bins = [np.array([ 0.95, 1.001]), np.linspace(9, 32, 8)]
+
+        # set bins for the whole distribution for sampling
         if  n_bins[0][0]!=0.:
             self.n_bins_full = [np.concatenate((np.array([0]), n_bins[0])), n_bins[1]]
         else:
             self.n_bins_full = n_bins
 
-        # n_bins = 50
+        # set the bins and PSD output for the class
         self.n_bins = n_bins
         # self.GetBkgRatio()
-        # range_hist = ((-0.01,1.01), (9, 32))
         predict_1 = self.v_predict[:,1]
         self.predict_1 = predict_1
         indices_bkg_NC = (self.v_labels==0)
         indices_sig = (self.v_labels==1)
         equen = self.v_equen
 
+        # Getting PDF for signal and background
         self.h2d_sig = hl.hist((predict_1[indices_sig], equen[indices_sig]), bins=n_bins).normalize(integrate=False)
         self.h2d_bkg_NC = hl.hist((predict_1[indices_bkg_NC], equen[indices_bkg_NC]), bins=n_bins).normalize(integrate=False)
         self.h2d_sig_full = hl.hist((predict_1[indices_sig], equen[indices_sig]), bins=self.n_bins_full).normalize(integrate=False)
@@ -100,6 +140,8 @@ class FLH:
             self.dir_h2d_other_bkg[key] = hl.hist((self.dir_other_bkg[key]["prod"], self.dir_other_bkg[key]["equen"]), bins=n_bins).normalize(integrate=False)
             self.dir_h2d_other_bkg_full[key] = hl.hist((self.dir_other_bkg[key]["prod"], self.dir_other_bkg[key]["equen"]), bins=self.n_bins_full).normalize(integrate=False)
         self.n_h2d_need_to_fit = len(self.dir_h2d_other_bkg.keys())+2
+
+        # Plot all PDFs using in this fitting
         if plot_2d_pdf:
             # plot 2D hist PDF
             fig1, ax1 = plt.subplots()
@@ -107,9 +149,10 @@ class FLH:
             hl.plot2d(ax1, h2d, log=True, cbar=True, clabel="counts per bin")
             SetTitle("PDF(Signal + NC)")
 
-            fig2, (ax2, ax3) = plt.subplots(1, 2, figsize=(16,6))
+            fig2, ax2 = plt.subplots()
             hl.plot2d(ax2, self.h2d_sig, log=True, cbar=True, clabel="counts per bin")
             SetTitle("PDF(Signal)", ax2)
+            fig2_extra, ax3 = plt.subplots()
             hl.plot2d(ax3, self.h2d_bkg_NC, log=True, cbar=True, clabel="counts per bin")
             SetTitle("PDF(NC)", ax3)
 
@@ -118,13 +161,16 @@ class FLH:
                 fig_other_bkg, ax_other_bkg = plt.subplots()
                 hl.plot2d(ax_other_bkg, self.dir_h2d_other_bkg_full[key],log=True, cbar=True, clabel="counts per bin")
                 SetTitle(f"PDF({key})", ax_other_bkg)
+
             plt.show()
+
+        # Plot the projection of PDFs
         if plot_pdf_projection:
             fig_profile_equen, ax_profile_equen = plt.subplots()
-            hl.plot1d(ax_profile_equen, self.h2d_sig_full.project([1]), label="DSNB")
+            hl.plot1d(ax_profile_equen, self.h2d_sig.project([1]), label="DSNB")
             hl.plot1d(ax_profile_equen, self.h2d_bkg_NC.project([1]), label="atm-NC")
-            for key in self.dir_h2d_other_bkg_full.keys():
-                hl.plot1d(ax_profile_equen, self.dir_h2d_other_bkg_full[key].project([1]), label=key)
+            for key in self.dir_h2d_other_bkg.keys():
+                hl.plot1d(ax_profile_equen, self.dir_h2d_other_bkg[key].project([1]), label=key)
             ax_profile_equen.set_xlabel("$E_{quen}$ ")
             plt.title("Projection of $E_{quen}$")
             plt.legend()
@@ -149,35 +195,46 @@ class FLH:
             plt.show()
 
     def PlotHistToFit(self):
+        """
+        Plot histograms of samples to fit (checking the fitting samples)
+
+        :return:
+        """
         fig1, ax1 = plt.subplots()
         hl.plot2d(ax1, self.h2d_to_fit, cbar=True, clabel="counts per bin")
-        SetTitle("PDF(Signal + NC)")
+        SetTitle("Signal + NC")
 
         fig2, (ax2, ax3) = plt.subplots(1, 2, figsize=(16,6))
         hl.plot2d(ax2, self.h2d_sig_to_fit, cbar=True, clabel="counts per bin")
-        SetTitle("PDF(Signal)", ax2)
+        SetTitle("Signal", ax2)
         hl.plot2d(ax3, self.h2d_bkg_NC_to_fit, cbar=True, clabel="counts per bin")
-        SetTitle("PDF(NC)", ax3)
+        SetTitle("NC", ax3)
 
         n_other_bkg =len(self.dir_h2d_other_bkg_to_fit.keys())
         for i, key in enumerate(self.dir_other_bkg.keys()):
             fig_other_bkg, ax_other_bkg = plt.subplots()
             hl.plot2d(ax_other_bkg, self.dir_h2d_other_bkg_to_fit[key], cbar=True, clabel="counts per bin")
-            SetTitle(f"PDF({key})", ax_other_bkg)
+            SetTitle(f"{key}", ax_other_bkg)
         plt.show()
 
     def GetHistToFit(self, n_to_fit_sig:int, n_to_fit_bkg_NC:int, seed:int, print_fit_result:bool):
+        """
+
+        :param n_to_fit_sig:  the mean value of signal events number
+        :param n_to_fit_bkg_NC:  the mean value of NC background number
+        :param seed: the random seed for sampling
+        :param print_fit_result: boolean for whether print the fitting result
+        :return:
+        """
         self.print_fit_result = print_fit_result
         # plot_2d_to_fit = True
         # plot_2d_to_fit_full_bins = True
         self.seed = seed
         plot_2d_to_fit = False
         plot_2d_to_fit_full_bins = False
-        from matplotlib.colors import LogNorm
-
-        from collections import Counter
 
         n_sig_samples = np.random.poisson(n_to_fit_sig )
+        # Adding systematic uncertainty for toy sampling
         sys_uncertainty_factor = np.random.normal(1, 0.5)
         while sys_uncertainty_factor<0:
             sys_uncertainty_factor = np.random.normal(1, 0.5)
@@ -221,14 +278,22 @@ class FLH:
             # plt.hist2d(bkg_NC_sample[0], bkg_NC_sample[1], bins=self.n_bins_full, norm=LogNorm())
             plt.hist2d(bkg_NC_sample[0], bkg_NC_sample[1], bins=self.n_bins_full)
             plt.title("NC with full bins")
+            plt.xlabel("Prediction Output")
+            plt.ylabel("$E_{quen}$")
             plt.colorbar()
+            plt.savefig(dir_save_fig+"NC_samples.png")
             for key in self.dir_h2d_other_bkg_full.keys():
                 plt.figure()
                 plt.hist2d(dir_other_bkg_samples[key][0], dir_other_bkg_samples[key][1], bins=self.n_bins_full)
                 # norm=LogNorm())
                 plt.title(f"{key} with full bins")
                 plt.colorbar()
+                plt.xlabel("Prediction Output")
+                plt.ylabel("$E_{quen}$")
+                plt.savefig(dir_save_fig+key+"_samples.png")
+
             plt.show()
+            exit()
 
         self.h2d_sig_to_fit = h2d_sig_to_fit
         self.h2d_bkg_NC_to_fit = h2d_bkg_NC_to_fit
@@ -281,8 +346,6 @@ class FLH:
         Add the constraint of fast neutron
         """
         nll += (v_n[5] -0.4)**2/0.16
-        # nll += (v_n[1] - 16)**2/160000
-        # nll += (v_n[2] - 2.4)**2/10000
         """
         Add systematic uncertainty for all the bkg
         """
@@ -297,8 +360,6 @@ class FLH:
         # indices_negative = (n_j<0)
         # nll += (-5.)*np.sum(n_j[indices_negative])
 
-        # nll = - np.sum(self.h2d_to_fit.values * log_n_j - n_j )
-        # +N_exp - np.sum(self.h2d_to_fit.values)*np.log(N_exp)
         if self.plot_v_nll:
             print("v_n:\t:", v_n)
             print(f"nll:\t{nll}\n")
@@ -315,6 +376,8 @@ class FLH:
         Returns:
 
         """
+
+
         v_fit_once = m.np_values()
         result_fit = v_fit_once[0] * self.h2d_sig + (1+v_fit_once[self.n_h2d_need_to_fit])*v_fit_once[1] * self.h2d_bkg_NC
         for i,key in enumerate(self.dir_h2d_other_bkg):
@@ -322,28 +385,34 @@ class FLH:
         indices = (result_fit.values!=0)
         fig_profile_PSD, ax_profile_PSD = plt.subplots()
         hl.plot1d(ax_profile_PSD, result_fit.project([0]), label="Fit Result")
-        hl.plot1d(ax_profile_PSD, self.h2d_to_fit.project([0]), label="Input Events")
-        hl.plot1d(ax_profile_PSD, v_fit_once[0]*self.h2d_sig.project([0]), label="DSNB Fit")
-        hl.plot1d(ax_profile_PSD, v_fit_once[1]*(1+v_fit_once[self.n_h2d_need_to_fit])*self.h2d_bkg_NC.project([0]), label="atm-NC Fit")
+        hl.plot1d(ax_profile_PSD, self.h2d_to_fit.project([0]), errorbars=True,crosses=True,label="Input Events", color="black")
+        # PlotDataWithErrorBar( self.h2d_to_fit.project([0]), ax_profile_PSD)
+        hl.plot1d(ax_profile_PSD, v_fit_once[0]*self.h2d_sig.project([0]), ls="--" ,label="DSNB Fit")
+        hl.plot1d(ax_profile_PSD, v_fit_once[1]*(1+v_fit_once[self.n_h2d_need_to_fit])*self.h2d_bkg_NC.project([0]), ls="--" , label="atm-NC Fit")
         for i,key in enumerate(self.dir_h2d_other_bkg):
-            hl.plot1d(ax_profile_PSD, v_fit_once[i+2]*(v_fit_once[self.n_h2d_need_to_fit+i+1]+1)*self.dir_h2d_other_bkg[key].project([0]), label=key+" Fit")
+            hl.plot1d(ax_profile_PSD, v_fit_once[i+2]*(v_fit_once[self.n_h2d_need_to_fit+i+1]+1)*self.dir_h2d_other_bkg[key].project([0]), ls="--" , label=key+" Fit")
         ax_profile_PSD.set_xlabel("PSD Output")
         plt.title("Projection of PSD Output")
         plt.legend()
         fig_profile_Edep, ax_profile_Edep = plt.subplots()
         hl.plot1d(ax_profile_Edep, result_fit.project([1]),label="Fit Result")
-        hl.plot1d(ax_profile_Edep, self.h2d_to_fit.project([1]), label="Input Events")
-        hl.plot1d(ax_profile_Edep, v_fit_once[0]*self.h2d_sig.project([1]), label="DSNB Fit")
+        hl.plot1d(ax_profile_Edep, self.h2d_to_fit.project([1]), errorbars=True,crosses=True, label="Input Events", color="black")
+        hl.plot1d(ax_profile_Edep, v_fit_once[0]*self.h2d_sig.project([1]), ls="--", label="DSNB Fit")
         # hl.plot1d(ax_profile_Edep, 15*v_fit_once[1]*self.h2d_bkg_NC.project([1])/np.sum(self.h2d_bkg_NC.project([1]).values), label="atm-NC Fit")
-        hl.plot1d(ax_profile_Edep, v_fit_once[1]*(1+v_fit_once[self.n_h2d_need_to_fit])*self.h2d_bkg_NC.project([1]), label="atm-NC Fit")
+        hl.plot1d(ax_profile_Edep, v_fit_once[1]*(1+v_fit_once[self.n_h2d_need_to_fit])*self.h2d_bkg_NC.project([1]), ls="--", label="atm-NC Fit")
         for i,key in enumerate(self.dir_h2d_other_bkg):
-            hl.plot1d(ax_profile_Edep, v_fit_once[i+2]*(v_fit_once[self.n_h2d_need_to_fit+i+1]+1)*self.dir_h2d_other_bkg[key].project([1]), label=key+" Fit")
+            hl.plot1d(ax_profile_Edep, v_fit_once[i+2]*(v_fit_once[self.n_h2d_need_to_fit+i+1]+1)*self.dir_h2d_other_bkg[key].project([1]), ls="--", label=key+" Fit")
         ax_profile_Edep.set_xlabel("$E_{quen}$")
         plt.title("Projection of $E_{quen}$")
         plt.legend()
         plt.show()
 
     def FitHistZeroFix(self, v_n_initial):
+        """
+        This function is for the best fitting (not fix any parameters) and getting the minimal chi2
+        :param v_n_initial:
+        :return:
+        """
         if self.print_fit_result:
             print("v_n_initial:\t",v_n_initial)
         check_zero_result = False
@@ -356,12 +425,10 @@ class FLH:
             v_limit.append((-eposilon_limit, eposilon_limit))
             v_fix.append(False)
         v_error = np.ones(len(v_limit))*0.01
-        # print(v_limit)
+        # error is for the step for minimization process, errordef=0.5 is for the max likelihood fit, errordef =1 is for the min chi2 fit
         m = Minuit.from_array_func(self.LikelihoodFunc, v_n_initial,error=v_error, limit=v_limit, errordef=0.5) #iminuit  1.5.4    pypi_0    pypi
         m.migrad()
         self.fitter = m
-        # print("nll values:\t", m.fval)
-        #print(m.values)
         if  check_zero_result and m.np_values()[0] <=10.5 and m.np_values()[0]>=9.5:
             fig3, (ax4, ax5) = plt.subplots(1, 2, figsize=(16,6))
             hl.plot2d(ax4, flh.h2d_sig_to_fit, log=True, cbar=True, clabel="counts per bin")
@@ -369,13 +436,16 @@ class FLH:
             hl.plot2d(ax5, flh.h2d_bkg_NC_to_fit, log=True, cbar=True, clabel="counts per bin")
             SetTitle("NC", ax5)
             plt.show()
-
-        # print(m.np_values())
-        if self.check_result and np.sum(m.np_values()[:7])>50:
+        if self.check_result :
             self.PlotFitProfile(m)
         return (m.np_values(), m.fval)
 
     def FitHistFixSigN(self, v_n_initial):
+        """
+        This function aims to get chi2 profile which fix the number of signal fitting
+        :param v_n_initial: initial values for number of events
+        :return:
+        """
         if self.print_fit_result:
             print("v_n_initial:\t",v_n_initial)
         v_limit = [(fit_down_limit_sig, None), (0, None)]
@@ -392,12 +462,16 @@ class FLH:
         m.migrad()
         self.fitter_fix = m
         if self.check_result:
-            # and np.sum(m.np_values()[:7])>50:
             self.PlotFitProfile(m)
         return (m.np_values(),m.fval)
 
     # def FitHistFixOne(self):
 def PrintFitResult(v_n):
+    """
+    Print the fitting results in fit vector
+    :param v_n: fit vector
+    :return:
+    """
     print("Total input events:\t", np.sum(flh.h2d_to_fit.values))
     print("DSNB:\t", v_n[0])
     print("atmNC:\t", v_n[1])
@@ -409,31 +483,34 @@ def PrintFitResult(v_n):
     print("Total fit events:\t", np.sum(v_n[:-1]))
     print("fit vector:\t",v_n)
     print("-------------------------------------")
-def WhetherProblemFit(v_n, index_begin_epsilon):
-    threshold = 50
-    threshold_epsilon = 0.99
-    # if np.sum(v_n[:index_begin_epsilon])> threshold:
-    if np.max(v_n[index_begin_epsilon:]) > threshold_epsilon or np.min(v_n[index_begin_epsilon:])<-threshold_epsilon:
-        return True
-    else:
-        return False
-def Chi2Smooth(chi2_last, chi2):
-    if chi2 - chi2_last > 1:
-        return False
-    else:
-        return True
+
 
 if __name__ == '__main__':
-    fit_2d = True
+    import argparse
+    parser = argparse.ArgumentParser(description='DSNB fitter')
+    parser.add_argument("--fit1d", "-f", action="store_true", help="whether use 2d fit", default=False )
+    args = parser.parse_args()
+
+    ########## set some related parameters ##################
+    import os
+    dir_save_fig = "./figure_save/"
+    if not os.path.exists(dir_save_fig) or not os.path.exists("./fit_result_npz"):
+        os.makedirs(dir_save_fig)
+        os.makedirs("./fit_result_npz")
+    fit_2d = (not  args.fit1d)
+    if fit_2d:
+        label_fit_method = "2d"
+    else:
+        label_fit_method = "1d"
     print_fit_result = False
     # fit_2d = False
     set_initial_epsilon_zeros = True
     plot_nll_transition = False
     name_file_predict = "/afs/ihep.ac.cn/users/l/luoxj/sk_psd/model_maxtime_time_jobs_DSNB_sk_data/predict_0.npz"
     # only_best_fit = False
-    only_best_fit = False
+    only_best_fit = False #boolean switch for whether doing the best fit not get the chi2 profile
     if only_best_fit:
-        plot_chi2 = True
+        plot_chi2 = False
     else:
         plot_chi2 = True
     uncertainty_other_bkg = 0.5
@@ -445,42 +522,49 @@ if __name__ == '__main__':
     up_limit_random_init_NC = 10
     eposilon_limit = 1
     nll_last_fix = 0
+    # set how many times to try the initial values
     if fit_2d:
-        n_try_fix = 5
+        n_try_fix = 10
         n_try_nofix = 10
     else:
-        n_try_fix = 20
+        n_try_fix = 30
         n_try_nofix = 10
     np.random.seed(100)
-
     dir_other_bkg = {}
+    #######################################################
+
+
     flh = FLH()
     flh.plot_v_nll = plot_nll_transition
+    # Load the data about PSD and Equen
     flh.LoadPrediction(name_file_predict)
     flh.LoadOtherBkg("/afs/ihep.ac.cn/users/l/luoxj/sk_psd/model_maxtime_time_jobs_DSNB_sk_data/atm-CC_samples_predict_0.npz",
                      key="dict_samples",
                      key_in_dict="CC",
-                     sys_uncertrainty=uncertainty_other_bkg)
+                     sys_uncertainty=uncertainty_other_bkg)
     flh.LoadOtherBkg("/afs/ihep.ac.cn/users/l/luoxj/sk_psd/model_maxtime_time_jobs_DSNB_sk_data/Reactor-anti-Nu_samples_predict_0.npz",
                      key="dict_samples",
                      key_in_dict="Reactor-anti-Nu",
-                     sys_uncertrainty=uncertainty_other_bkg)
+                     sys_uncertainty=uncertainty_other_bkg)
     flh.LoadOtherBkg("/afs/ihep.ac.cn/users/l/luoxj/sk_psd/model_maxtime_time_jobs_DSNB_sk_data/Li9He8_samples_predict_0.npz",
                      key="dict_samples",
                      key_in_dict="He8Li9",
-                     sys_uncertrainty=uncertainty_other_bkg)
+                     sys_uncertainty=uncertainty_other_bkg)
     flh.LoadOtherBkg("/afs/ihep.ac.cn/users/l/luoxj/sk_psd/model_maxtime_time_jobs_DSNB_sk_data/FastN_samples_predict_0.npz",
                      key="dict_samples",
                      key_in_dict="FastN",
-                     sys_uncertrainty=uncertainty_other_bkg)
+                     sys_uncertainty=uncertainty_other_bkg)
 
+    # Set the events number for different kinds of events
     n_to_fit_bkg_NC = 460
     n_to_fit_sig = 0
     dir_n_other_bkg = {"CC":2.4,  "FastN":9.7, "He8Li9":0.08, "Reactor-anti-Nu":3.4}
     flh.SetNOtherBkg(dir_n_other_bkg)
 
+    # Get the PDF distribution
     flh.Get2DPDFHist(fit_2d=fit_2d)
 
+    # Preparation for getting chi2 profile
     from scipy.interpolate import interp1d
     v_uplimit_n_sig = []
     n_max_sig = 20
@@ -493,7 +577,7 @@ if __name__ == '__main__':
         v_fit_result[key] = []
     v2D_chi2 = [] # dimension 0 is for the times of trying , dimension 1 is for the number of fix signal
 
-    n_trails = 30
+    n_trails = 1000
     if only_best_fit:
         n_trails *= 2
     for i in trange(n_trails):
@@ -504,6 +588,7 @@ if __name__ == '__main__':
         num_iterations = 0
         if i %100 ==0:
             print(f"Processing {i} times fitting")
+        # Get the toy data histogram to fit
         v_n_other_bkg_initial = np.random.randint(0, up_limit_random_init, size=len(flh.dir_h2d_other_bkg.keys()))
         if not set_initial_epsilon_zeros:
             v_n_other_bkg_initial_epsilon = np.random.uniform(-1, 1, size=len(flh.dir_h2d_other_bkg.keys()))
@@ -513,15 +598,14 @@ if __name__ == '__main__':
             v_n_other_bkg_initial_epsilon = np.zeros(len(flh.dir_other_bkg.keys()))
         flh.GetHistToFit(n_to_fit_bkg_NC=n_to_fit_bkg_NC, n_to_fit_sig=n_to_fit_sig, seed=i, print_fit_result=print_fit_result)
 
-        v_val_one_nofix = []
-        for i_try in range(n_try_nofix):
+        v_val_one_nofix = [] # store nll values for different initial values and then get the min nll as fit value
+        for i_try in range(n_try_nofix): # try different initial values for best fitting
             v_n_tmp, f_val_nofix_tmp = flh.FitHistZeroFix(np.concatenate(([np.random.randint(0, up_limit_random_init_DSNB), np.random.randint(0, up_limit_random_init_NC)],
                                                                   v_n_other_bkg_initial,
                                                                   [NC_bkg_initial_epsilon],
                                                                   v_n_other_bkg_initial_epsilon)))
 
             while (not (flh.fitter.get_fmin()['is_valid'] and flh.fitter.get_fmin()['has_accurate_covar'])):
-                    # or WhetherProblemFit(v_n, flh.n_h2d_need_to_fit):
                 if num_iterations > 9:
                     break
                 num_iterations += 1
@@ -542,6 +626,7 @@ if __name__ == '__main__':
             if len(v_val_one_nofix)==1 or np.min(v_val_one_nofix[:-1]) >= f_val_nofix_tmp:
                 v_n = v_n_tmp
 
+        # summary the best fitting result
         v_fit_result["sig"].append(v_n[0])
         v_fit_result["bkg"].append(v_n[1])
         if print_fit_result:
@@ -551,13 +636,13 @@ if __name__ == '__main__':
         f_val_nofix = np.min(v_val_one_nofix)
         nll_last_fix = f_val_nofix
 
+        # This fit is for getting chi2 profile
         if not only_best_fit:
             v_chi2 = []
-
             for j in v_n_sig_to_fix:
             # for j in [23]:
                 v_val_one_fix = []
-                for i_try in range(n_try_fix):
+                for i_try in range(n_try_fix): # Trying different initial values
                     v_n_other_bkg_initial = np.random.randint(0, up_limit_random_init, size=len(flh.dir_h2d_other_bkg.keys()))
                     if not set_initial_epsilon_zeros:
                         v_n_other_bkg_initial_epsilon = np.random.uniform(-1, 1, size=len(flh.dir_h2d_other_bkg.keys()))
@@ -577,8 +662,6 @@ if __name__ == '__main__':
                         plt.show()
                     num_iterations = 0
                     while (not (flh.fitter_fix.get_fmin()['is_valid'] and flh.fitter_fix.get_fmin()['has_accurate_covar'])):
-                            # or not Chi2Smooth(nll_last_fix, f_val_fix):
-                            # or WhetherProblemFit(v_n_fix, flh.n_h2d_need_to_fit):
                         if num_iterations > 9:
                             break
                         print(f"Refitting!! {num_iterations} times in fixing fit")
@@ -605,6 +688,8 @@ if __name__ == '__main__':
 
             index_min = np.argmin(v_chi2)
             v2D_chi2.append(v_chi2)
+
+            # Getting the chi2 profile and chi2=2.70's point of intersection
             try:
                 f = interp1d( v_chi2[index_min:], v_n_sig_to_fix[index_min:], kind="linear", fill_value="extrapolate")
                 uplimit_n_sig = f(chi2_criteria)
@@ -622,7 +707,7 @@ if __name__ == '__main__':
         # print("index:\t", index_min)
         # plt.show()
 
-
+    # Plot the figure we need
     plt.figure()
     if n_to_fit_sig != 0:
         plt.hist(v_fit_result["sig"], histtype="step", bins=50)
@@ -646,8 +731,10 @@ if __name__ == '__main__':
         plt.plot([0, n_max_sig], [chi2_criteria, chi2_criteria],"--", label="90% confidence")
         plt.ylim(0,10)
         plt.xlabel("Number of Signal Counts")
-        plt.ylabel("$L_{min}^{fix}-L_{min}^{nofix}$")
+        plt.ylabel("$NLL_{min}^{fix}-NLL_{min}^{nofix}$")
         plt.legend()
+
+        plt.savefig(dir_save_fig+"chi_profile_"+label_fit_method+".png")
 
         plt.figure()
         v_uplimit_n_sig = np.array(v_uplimit_n_sig).reshape(-1)
@@ -655,12 +742,12 @@ if __name__ == '__main__':
         h_uplimit = plt.hist(v_uplimit_n_sig, histtype="step", bins=10)
         median_uplimit = np.median(v_uplimit_n_sig)
         print("median:\t", median_uplimit)
-        plt.plot([median_uplimit, median_uplimit], [0, np.max(h_uplimit[0])], "--")
+        plt.plot([median_uplimit, median_uplimit], [0, np.max(h_uplimit[0])], "--", label="median:  {:.2f}".format(median_uplimit))
         plt.xlabel("Uplimit of Number of signal")
-        if fit_2d:
-            np.save("v_uplimit_2d.npy", v_uplimit_n_sig)
-        else:
-            np.save("v_uplimit_1d.npy", v_uplimit_n_sig)
+        plt.legend()
+        plt.savefig(dir_save_fig+"uplimit_"+label_fit_method+"_v2.png")
+        np.save(f"./fit_result_npz/v_uplimit_{label_fit_method}_v2.npy", v_uplimit_n_sig)
+        np.savez(f"./fit_result_npz/v_chi2_{label_fit_method}_v2.npz", v_n_sig=v_n_sig_to_fix, v_chi2=v2D_chi2)
 
 
     plt.show()
