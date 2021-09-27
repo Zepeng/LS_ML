@@ -107,7 +107,7 @@ class SpectrumAna():
         rf2 = RandomForestClassifier(n_estimators=100, criterion='gini',
                                                 max_depth=10, random_state=0, max_features=None)
         models["RandomForest2"] = rf2
-        models["MLPClassifier"] = MLPClassifier(solver='lbfgs', random_state=0)
+        models["MLPClassifier"] = MLPClassifier(solver='sgd', random_state=0)
         models["GaussianNB"] =  GaussianNB()
         self.models = models
 
